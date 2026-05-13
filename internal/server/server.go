@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
@@ -57,6 +58,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/huggingface/models", s.huggingFaceModels)
 	mux.HandleFunc("/api/settings", s.settings)
 	mux.HandleFunc("/api/export/cli-config/options", s.cliConfigExportOptions)
+	mux.HandleFunc("/api/export/cli-config/download", s.cliConfigExportDownload)
 	mux.HandleFunc("/api/update/check", s.updateCheck)
 	mux.HandleFunc("/api/update/download", s.updateDownload)
 	mux.HandleFunc("/api/update/progress", s.updateProgress)
@@ -249,6 +251,44 @@ func (s *Server) cliConfigExportOptions(w http.ResponseWriter, r *http.Request) 
 			},
 		},
 	})
+}
+
+func (s *Server) cliConfigExportDownload(w http.ResponseWriter, r *http.Request) {
+	tool := strings.TrimSpace(r.URL.Query().Get("tool"))
+	baseURL := strings.TrimSpace(r.URL.Query().Get("base_url"))
+	contextSize := strings.TrimSpace(r.URL.Query().Get("context_size"))
+	if baseURL == "" {
+		http.Error(w, "base_url is required", http.StatusBadRequest)
+		return
+	}
+	models, err := s.ollama.Models(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+	modelNames := make([]string, 0, len(models))
+	for _, model := range models {
+		modelNames = append(modelNames, model.Name)
+	}
+	if len(modelNames) == 0 {
+		http.Error(w, "no installed models available", http.StatusBadRequest)
+		return
+	}
+	size := exportContextSize(contextSize)
+	filename := "opencode.json"
+	var payload interface{}
+	switch tool {
+	case "openclaw":
+		filename = "models.json"
+		payload = buildOpenClawExport(baseURL, modelNames, size)
+	default:
+		payload = buildOpenCodeExport(baseURL, modelNames, size)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
+	encoder := json.NewEncoder(w)
+	encoder.SetIndent("", "  ")
+	_ = encoder.Encode(payload)
 }
 
 func (s *Server) updateCheck(w http.ResponseWriter, r *http.Request) {
@@ -491,6 +531,69 @@ func tailscaleStatusJSON(ctx context.Context) ([]byte, error) {
 		lastErr = err
 	}
 	return nil, lastErr
+}
+
+func exportContextSize(value string) int {
+	const fallback = 32768
+	size, err := strconv.Atoi(strings.TrimSpace(value))
+	if err != nil || size < 4096 {
+		return fallback
+	}
+	if size > 131072 {
+		return 131072
+	}
+	return size
+}
+
+func buildOpenCodeExport(baseURL string, models []string, contextSize int) map[string]interface{} {
+	modelMap := make(map[string]interface{}, len(models))
+	for _, model := range models {
+		modelMap[model] = map[string]interface{}{
+			"name": model,
+			"options": map[string]interface{}{
+				"num_ctx": contextSize,
+			},
+		}
+	}
+	return map[string]interface{}{
+		"$schema": "https://opencode.ai/config.json",
+		"provider": map[string]interface{}{
+			"nucleus": map[string]interface{}{
+				"npm":  "@ai-sdk/openai-compatible",
+				"name": "Nucleus",
+				"options": map[string]interface{}{
+					"baseURL": baseURL,
+				},
+				"models": modelMap,
+			},
+		},
+	}
+}
+
+func buildOpenClawExport(baseURL string, models []string, contextSize int) map[string]interface{} {
+	modelList := make([]map[string]interface{}, 0, len(models))
+	for _, model := range models {
+		modelList = append(modelList, map[string]interface{}{
+			"id":            model,
+			"name":          model,
+			"reasoning":     false,
+			"input":         []string{"text"},
+			"contextWindow": contextSize,
+			"contextTokens": contextSize,
+		})
+	}
+	return map[string]interface{}{
+		"models": map[string]interface{}{
+			"mode": "merge",
+			"providers": map[string]interface{}{
+				"nucleus": map[string]interface{}{
+					"baseUrl": baseURL,
+					"api":     "openai-completions",
+					"models":  modelList,
+				},
+			},
+		},
+	}
 }
 
 func modelFromBody(body []byte) string {

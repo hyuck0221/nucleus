@@ -641,55 +641,6 @@
       $('contextSizeValue').textContent = formatContextSize(rounded);
     }
 
-    function buildOpenCodeConfig(baseURL, models, contextSize) {
-      const entries = Object.fromEntries(models.map((name) => [name, {name, options: {num_ctx: contextSize}}]));
-      return {
-        $schema: 'https://opencode.ai/config.json',
-        provider: {
-          nucleus: {
-            npm: '@ai-sdk/openai-compatible',
-            name: 'Nucleus',
-            options: {baseURL},
-            models: entries
-          }
-        }
-      };
-    }
-
-    function buildOpenClawConfig(baseURL, models, contextSize) {
-      return {
-        models: {
-          mode: 'merge',
-          providers: {
-            nucleus: {
-              baseUrl: baseURL,
-              api: 'openai-completions',
-              models: models.map((name) => ({
-                id: name,
-                name,
-                reasoning: false,
-                input: ['text'],
-                contextWindow: contextSize,
-                contextTokens: contextSize
-              }))
-            }
-          }
-        }
-      };
-    }
-
-    function downloadJSON(filename, data) {
-      const blob = new Blob([`${JSON.stringify(data, null, 2)}\n`], {type:'application/json'});
-      const href = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = href;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(href);
-    }
-
     function exportCliConfig() {
       const baseURL = selectedBaseURL();
       const models = cliModels();
@@ -701,11 +652,12 @@
         $('cliExportStatus').textContent = 'No installed models are available to export.';
         return;
       }
-      if (selectedCliTool === 'openclaw') {
-        downloadJSON('models.json', buildOpenClawConfig(baseURL, models, selectedContextSize()));
-      } else {
-        downloadJSON('opencode.json', buildOpenCodeConfig(baseURL, models, selectedContextSize()));
-      }
+      const params = new URLSearchParams({
+        tool: selectedCliTool,
+        base_url: baseURL,
+        context_size: String(selectedContextSize())
+      });
+      window.location.href = `/api/export/cli-config/download?${params.toString()}`;
       $('cliExportStatus').textContent = `Downloaded ${selectedCliTool === 'openclaw' ? 'models.json' : 'opencode.json'}.`;
     }
 
