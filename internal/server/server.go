@@ -10,7 +10,9 @@ import (
 	"io"
 	"io/fs"
 	"log/slog"
+	"net"
 	"net/http"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -35,7 +37,9 @@ type Server struct {
 }
 
 func New(ollamaClient *ollama.Client, usage *store.Store, logger *slog.Logger) *Server {
-	return &Server{ollama: ollamaClient, hf: huggingface.New(), config: settings.New(), update: updater.New(), store: usage, logger: logger}
+	srv := &Server{ollama: ollamaClient, hf: huggingface.New(), config: settings.New(), update: updater.New(), store: usage, logger: logger}
+	go srv.cleanupUsageLoop()
+	return srv
 }
 
 func (s *Server) Handler() http.Handler {
@@ -51,10 +55,14 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/models/delete", s.deleteModel)
 	mux.HandleFunc("/api/huggingface/models", s.huggingFaceModels)
 	mux.HandleFunc("/api/settings", s.settings)
+	mux.HandleFunc("/api/export/cli-config/options", s.cliConfigExportOptions)
 	mux.HandleFunc("/api/update/check", s.updateCheck)
 	mux.HandleFunc("/api/update/download", s.updateDownload)
 	mux.HandleFunc("/api/update/progress", s.updateProgress)
 	mux.HandleFunc("/api/usage", s.usage)
+	mux.HandleFunc("/api/usage/delete", s.deleteUsage)
+	mux.HandleFunc("/api/usage/clear", s.clearUsage)
+	mux.HandleFunc("/api/requests/stop", s.stopRequest)
 	mux.HandleFunc("/api/events", s.events)
 	mux.HandleFunc("/v1/models", s.openAIModels)
 	mux.HandleFunc("/v1/chat/completions", s.chatCompletions)
@@ -206,6 +214,42 @@ func (s *Server) settings(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (s *Server) cliConfigExportOptions(w http.ResponseWriter, r *http.Request) {
+	models, err := s.ollama.Models(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+	modelNames := make([]string, 0, len(models))
+	for _, model := range models {
+		modelNames = append(modelNames, model.Name)
+	}
+	port := requestPort(r)
+	localHost := firstPrivateIPv4()
+	localBaseURL := ""
+	if localHost != "" {
+		localBaseURL = fmt.Sprintf("http://%s:%s/v1", localHost, port)
+	}
+	tailscaleHost, tailscaleOK := tailscaleDNSName(r.Context())
+	tailscaleBaseURL := ""
+	if tailscaleOK {
+		tailscaleBaseURL = fmt.Sprintf("http://%s:%s/v1", tailscaleHost, port)
+	}
+	writeJSON(w, map[string]interface{}{
+		"models": modelNames,
+		"addresses": map[string]interface{}{
+			"local": map[string]interface{}{
+				"available": localBaseURL != "",
+				"baseURL":   localBaseURL,
+			},
+			"tailscale": map[string]interface{}{
+				"available": tailscaleOK,
+				"baseURL":   tailscaleBaseURL,
+			},
+		},
+	})
+}
+
 func (s *Server) updateCheck(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
@@ -229,6 +273,45 @@ func (s *Server) updateProgress(w http.ResponseWriter, r *http.Request) {
 func (s *Server) usage(w http.ResponseWriter, r *http.Request) {
 	active, recent := s.store.Snapshot()
 	writeJSON(w, map[string]interface{}{"active": active, "recent": recent})
+}
+
+func (s *Server) deleteUsage(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete && r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		ID string `json:"id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || strings.TrimSpace(req.ID) == "" {
+		http.Error(w, "expected id", http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, map[string]bool{"deleted": s.store.DeleteRecent(req.ID)})
+}
+
+func (s *Server) clearUsage(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost && r.Method != http.MethodDelete {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	s.store.ClearRecent()
+	writeJSON(w, map[string]bool{"cleared": true})
+}
+
+func (s *Server) stopRequest(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		ID string `json:"id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || strings.TrimSpace(req.ID) == "" {
+		http.Error(w, "expected id", http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, map[string]bool{"stopped": s.store.Stop(req.ID)})
 }
 
 func (s *Server) events(w http.ResponseWriter, r *http.Request) {
@@ -289,8 +372,10 @@ func (s *Server) chatCompletions(w http.ResponseWriter, r *http.Request) {
 		Path:      r.URL.Path,
 		StartedAt: time.Now(),
 	}
-	s.store.Start(record)
-	resp, err := s.ollama.ProxyOpenAI(r.Context(), strings.NewReader(string(body)))
+	ctx, cancel := context.WithCancel(r.Context())
+	defer cancel()
+	s.store.Start(record, cancel)
+	resp, err := s.ollama.ProxyOpenAI(ctx, strings.NewReader(string(body)))
 	if err != nil {
 		s.store.Finish(id, http.StatusBadGateway, err.Error())
 		http.Error(w, err.Error(), http.StatusBadGateway)
@@ -311,9 +396,73 @@ func (s *Server) chatCompletions(w http.ResponseWriter, r *http.Request) {
 	s.store.Finish(id, resp.StatusCode, errText)
 }
 
+func (s *Server) cleanupUsageLoop() {
+	ticker := time.NewTicker(time.Minute)
+	defer ticker.Stop()
+	for range ticker.C {
+		cfg := s.config.Get()
+		if !cfg.AutoDeleteUsage || cfg.UsageRetentionHours <= 0 {
+			continue
+		}
+		removed := s.store.ClearOlderThan(time.Now().Add(-time.Duration(cfg.UsageRetentionHours) * time.Hour))
+		if removed > 0 {
+			s.store.Publish("usage_auto_deleted", map[string]int{"count": removed})
+		}
+	}
+}
+
 func writeJSON(w http.ResponseWriter, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(data)
+}
+
+func requestPort(r *http.Request) string {
+	_, port, err := net.SplitHostPort(r.Host)
+	if err == nil && strings.TrimSpace(port) != "" {
+		return port
+	}
+	if strings.HasSuffix(r.Host, "]") {
+		return "8787"
+	}
+	return "8787"
+}
+
+func firstPrivateIPv4() string {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return ""
+	}
+	for _, addr := range addrs {
+		network, ok := addr.(*net.IPNet)
+		if !ok || network.IP == nil || network.IP.IsLoopback() {
+			continue
+		}
+		ip := network.IP.To4()
+		if ip == nil || !ip.IsPrivate() {
+			continue
+		}
+		return ip.String()
+	}
+	return ""
+}
+
+func tailscaleDNSName(ctx context.Context) (string, bool) {
+	ctx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+	output, err := exec.CommandContext(ctx, "tailscale", "status", "--json").Output()
+	if err != nil {
+		return "", false
+	}
+	var status struct {
+		Self struct {
+			DNSName string `json:"DNSName"`
+		} `json:"Self"`
+	}
+	if err := json.Unmarshal(output, &status); err != nil {
+		return "", false
+	}
+	host := strings.TrimSuffix(strings.TrimSpace(status.Self.DNSName), ".")
+	return host, host != ""
 }
 
 func modelFromBody(body []byte) string {

@@ -14,7 +14,7 @@
     header { display:flex; align-items:center; justify-content:space-between; padding:18px 22px; border-bottom:1px solid var(--line); background:#14171a; position:sticky; top:0; z-index:2; }
     h1 { display:flex; align-items:center; gap:10px; font-size:19px; margin:0; letter-spacing:0; }
     .brand-logo { width:28px; height:28px; border-radius:6px; display:block; }
-    button, input { font:inherit; }
+    button, input, select { font:inherit; }
     main { padding:22px; display:grid; gap:18px; max-width:1280px; margin:0 auto; }
     .grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; }
     .panel { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:16px; min-width:0; }
@@ -23,7 +23,7 @@
     .ok { color:var(--ok); } .warn { color:var(--warn); } .bad { color:var(--bad); }
     .toolbar { display:flex; gap:8px; flex-wrap:wrap; align-items:flex-start; }
     .model-search { position:relative; min-width:220px; }
-    input { background:#0f1114; color:var(--text); border:1px solid var(--line); border-radius:7px; padding:9px 10px; width:100%; min-width:0; user-select:text; -webkit-user-select:text; }
+    input, select { background:#0f1114; color:var(--text); border:1px solid var(--line); border-radius:7px; padding:9px 10px; width:100%; min-width:0; user-select:text; -webkit-user-select:text; }
     button { background:var(--accent); color:#071019; border:0; border-radius:7px; padding:9px 12px; font-weight:700; cursor:pointer; }
     button:disabled { cursor:not-allowed; opacity:.62; }
     .icon-btn { display:inline-flex; align-items:center; gap:7px; min-height:36px; }
@@ -53,6 +53,10 @@
     .model-name { cursor:pointer; color:#d9ecff; }
     .model-name:hover { color:#fff; }
     .download-badge { color:#071019; background:var(--warn); border-radius:999px; padding:2px 7px; font-size:11px; font-weight:700; }
+    .status-pill { display:inline-flex; border-radius:999px; padding:2px 7px; font-size:11px; font-weight:700; }
+    .status-pill.success { color:#071019; background:var(--ok); }
+    .status-pill.error { color:#fff; background:var(--bad); }
+    .compact-field { width:110px; }
     dialog { width:min(760px,calc(100vw - 32px)); max-height:calc(100vh - 32px); padding:0; color:var(--text); background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:0 24px 70px rgba(0,0,0,.45); }
     dialog::backdrop { background:rgba(0,0,0,.52); }
     .dialog-head { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px 18px; border-bottom:1px solid var(--line); }
@@ -74,6 +78,23 @@
     .settings-update-actions .update-progress { width:120px; }
     .section-title { color:var(--muted); font-size:13px; font-weight:700; }
     .download-row { display:grid; grid-template-columns:minmax(220px,1fr) auto; gap:8px; align-items:start; }
+    .export-actions, .tool-grid, .address-options { display:grid; gap:10px; }
+    .export-actions { grid-template-columns:1fr; }
+    .tool-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .tool-btn, .address-option { background:#12161b; color:var(--text); border:1px solid var(--line); text-align:left; padding:12px; display:grid; gap:4px; }
+    .tool-btn.active, .address-option.active { border-color:var(--accent); background:#17202a; }
+    .tool-btn strong, .address-option strong { font-size:14px; }
+    .tool-btn span, .address-option span, .export-note { color:var(--muted); font-size:12px; overflow-wrap:anywhere; }
+    .address-option { width:100%; }
+    .export-footer { display:flex; gap:8px; justify-content:flex-end; align-items:center; flex-wrap:wrap; }
+    .export-input { display:none; gap:8px; }
+    .export-input.open { display:grid; }
+    .export-status { min-height:18px; color:var(--muted); font-size:12px; }
+    .range-row { display:grid; gap:10px; }
+    .range-head { display:flex; align-items:center; justify-content:space-between; gap:12px; color:var(--muted); font-size:12px; }
+    .range-value { color:var(--text); font-weight:800; font-size:14px; }
+    .range-scale { display:flex; align-items:center; justify-content:space-between; gap:12px; color:var(--muted); font-size:12px; }
+    input[type="range"] { padding:0; height:20px; accent-color:var(--accent); }
     .hf-results { display:grid; gap:6px; max-height:min(280px,32vh); overflow:auto; padding-right:4px; }
     .hf-card { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:6px 10px; align-items:center; padding:9px 10px; border:1px solid var(--line); border-radius:7px; background:#12161b; min-height:58px; }
     .hf-card strong { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:13px; line-height:1.25; }
@@ -100,13 +121,17 @@
     th { color:var(--muted); font-weight:600; }
     .span2 { grid-column:span 2; }
     .span4 { grid-column:span 4; }
-    @media (max-width:900px) { .grid { grid-template-columns:1fr; } .span2,.span4 { grid-column:auto; } header { align-items:flex-start; gap:10px; flex-direction:column; } .update-banner { top:108px; align-items:flex-start; flex-direction:column; } .update-actions, .update-progress { width:100%; } .toolbar, .download-row, .model-search { width:100%; grid-template-columns:1fr; } .panel-head { align-items:flex-start; flex-direction:column; } #openDownloadBtn, #pullBtn, #hfSearchBtn { width:100%; } .hf-results { max-height:240px; } .hf-card { grid-template-columns:minmax(0,1fr) auto; } }
+    @media (max-width:900px) { .grid { grid-template-columns:1fr; } .span2,.span4 { grid-column:auto; } header { align-items:flex-start; gap:10px; flex-direction:column; } .update-banner { top:108px; align-items:flex-start; flex-direction:column; } .update-actions, .update-progress { width:100%; } .toolbar, .download-row, .model-search, .tool-grid { width:100%; grid-template-columns:1fr; } .panel-head { align-items:flex-start; flex-direction:column; } #openExportBtn, #openDownloadBtn, #pullBtn, #hfSearchBtn { width:100%; } .hf-results { max-height:240px; } .hf-card { grid-template-columns:minmax(0,1fr) auto; } }
   </style>
 </head>
 <body>
   <header>
     <h1><img class="brand-logo" src="/assets/icons/favicon-32.png" alt="">Nucleus</h1>
     <div class="toolbar">
+      <button id="openExportBtn" class="ghost-btn icon-btn" type="button" title="Export">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m17 8-5-5-5 5"/><path d="M5 21h14"/></svg>
+        Export
+      </button>
       <button id="openDownloadBtn" class="icon-btn" type="button" title="Download model">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
         Download model
@@ -162,6 +187,84 @@
       </div>
     </div>
   </dialog>
+  <dialog id="exportDialog">
+    <div class="dialog-head">
+      <div class="dialog-title">Export</div>
+      <button id="closeExportBtn" class="ghost-btn" type="button">Close</button>
+    </div>
+    <div class="dialog-body">
+      <div class="export-actions">
+        <button id="openCliExportBtn" class="tool-btn" type="button">
+          <strong>CLI .json config file export</strong>
+          <span>Generate client-specific JSON configuration files for external CLI tools.</span>
+        </button>
+      </div>
+    </div>
+  </dialog>
+  <dialog id="cliExportDialog">
+    <div class="dialog-head">
+      <div class="dialog-title">CLI .json config file export</div>
+      <button id="closeCliExportBtn" class="ghost-btn" type="button">Close</button>
+    </div>
+    <div class="dialog-body">
+      <div class="download-section">
+        <div class="section-title">CLI tool</div>
+        <div class="tool-grid">
+          <button class="tool-btn active" type="button" data-cli-tool="opencode">
+            <strong>OpenCode</strong>
+            <span>Downloads `opencode.json` for project-root configuration.</span>
+          </button>
+          <button class="tool-btn" type="button" data-cli-tool="openclaw">
+            <strong>OpenClaw</strong>
+            <span>Downloads `models.json` for a custom OpenAI-compatible provider.</span>
+          </button>
+        </div>
+      </div>
+      <div class="download-section">
+        <div class="section-title">Nucleus call address</div>
+        <div class="address-options">
+          <button class="address-option active" type="button" data-address-kind="local">
+            <strong>My IP</strong>
+            <span id="localAddressLabel">Detecting...</span>
+          </button>
+          <button class="address-option" type="button" data-address-kind="tailscale">
+            <strong>Tailscale</strong>
+            <span id="tailscaleAddressLabel">Detecting...</span>
+          </button>
+          <button class="address-option" type="button" data-address-kind="custom">
+            <strong>Direct input</strong>
+            <span>Use a host or full `/v1` endpoint entered below.</span>
+          </button>
+        </div>
+        <div id="customAddressWrap" class="export-input">
+          <input id="customBaseURL" placeholder="http://server.example:8787 or http://server.example:8787/v1" autocomplete="off" aria-label="Custom Nucleus address">
+        </div>
+      </div>
+      <div class="download-section">
+        <div class="section-title">Context size</div>
+        <div class="range-row">
+          <div class="range-head">
+            <span>Context window</span>
+            <span id="contextSizeValue" class="range-value">32K</span>
+          </div>
+          <input id="contextSizeDial" type="range" min="4096" max="131072" step="4096" value="32768" aria-label="Context size dial">
+          <div class="range-scale">
+            <span>4K min</span>
+            <span>128K max</span>
+          </div>
+          <input id="contextSize" type="number" min="4096" max="131072" step="4096" value="32768" aria-label="Context size">
+        </div>
+        <div class="export-note">Applied to exported model settings where the target CLI supports it.</div>
+      </div>
+      <div class="download-section">
+        <div class="export-note">Installed local models are embedded into the generated JSON automatically.</div>
+        <div id="cliExportStatus" class="export-status"></div>
+        <div class="export-footer">
+          <button id="downloadCliConfigBtn" type="button">Download JSON</button>
+        </div>
+      </div>
+    </div>
+  </dialog>
   <dialog id="settingsDialog">
     <div class="dialog-head">
       <div class="dialog-title">Settings</div>
@@ -177,6 +280,23 @@
           <input id="launchAtLogin" type="checkbox">
           <span class="slider"></span>
         </label>
+      </div>
+      <div class="settings-row">
+        <div>
+          <strong>Automatically delete API usage</strong>
+          <span>Periodically remove usage records older than the retention window.</span>
+        </div>
+        <label class="switch">
+          <input id="autoDeleteUsage" type="checkbox">
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="settings-row">
+        <div>
+          <strong>Usage retention</strong>
+          <span>Delete records after this many hours when automatic cleanup is enabled.</span>
+        </div>
+        <input id="usageRetentionHours" class="compact-field" type="number" min="1" max="8760" step="1">
       </div>
       <div class="settings-row">
         <div>
@@ -213,7 +333,7 @@
           <div class="metric">Installed models</div>
           <div id="modelPagerTop" class="metric"></div>
         </div>
-        <table><thead><tr><th>Model</th><th>Size</th><th></th></tr></thead><tbody id="models"></tbody></table>
+        <table><thead><tr><th>Model</th><th>Size</th><th>Installed</th><th></th></tr></thead><tbody id="models"></tbody></table>
         <div class="pager">
           <button id="modelPrev" type="button">Prev</button>
           <span id="modelPageInfo"></span>
@@ -222,7 +342,7 @@
       </div>
       <div class="panel span2">
         <div class="metric">Active now</div>
-        <table><thead><tr><th>User</th><th>Model</th><th>Client</th><th>Started</th></tr></thead><tbody id="active"></tbody></table>
+        <table><thead><tr><th>User</th><th>Model</th><th>Client</th><th>Started</th><th></th></tr></thead><tbody id="active"></tbody></table>
       </div>
       <div class="panel span4">
         <div class="panel-head">
@@ -233,8 +353,9 @@
             <button class="tab-btn" type="button" data-usage-tab="error">Error</button>
           </div>
         </div>
-        <table><thead><tr><th>User</th><th>Model</th><th>Status</th><th>Duration</th><th>Client</th></tr></thead><tbody id="recent"></tbody></table>
+        <table><thead><tr><th>User</th><th>Model</th><th>Result</th><th>Time</th><th>Duration</th><th>Client</th><th></th></tr></thead><tbody id="recent"></tbody></table>
         <div class="pager">
+          <button id="usageClear" class="danger-btn" type="button">Clear</button>
           <button id="usagePrev" type="button">Prev</button>
           <span id="usagePageInfo"></span>
           <button id="usageNext" type="button">Next</button>
@@ -246,14 +367,19 @@
     const $ = (id) => document.getElementById(id);
     const fmtBytes = (n) => n ? `${(n/1024/1024/1024).toFixed(1)} GB` : "";
     const fmtTime = (v) => v ? new Date(v).toLocaleTimeString() : "";
+    const fmtDate = (v) => v ? new Date(v).toLocaleDateString() : "";
+    const fmtDateTime = (v) => v ? new Date(v).toLocaleString() : "";
     const fmtDuration = (ns) => ns ? `${(ns / 1e9).toFixed(2)}s` : "";
     const escapeHTML = (value) => String(value).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     let pullState = null;
     let hfSearchTimer = null;
     let updatePoll = null;
     let availableUpdate = null;
-    let appSettings = {launchAtLogin:false, autoCheckUpdate:true};
+    let appSettings = {launchAtLogin:false, autoCheckUpdate:true, autoDeleteUsage:false, usageRetentionHours:72};
     let cachedModels = [];
+    let cliExportOptions = null;
+    let selectedCliTool = 'opencode';
+    let selectedAddressKind = 'local';
     let recentRecords = [];
     let modelPage = 1;
     let usagePage = 1;
@@ -281,7 +407,7 @@
       recentRecords = status.recent || [];
       renderModels();
       renderUsage();
-      $('active').innerHTML = status.active.map(r => `<tr><td>${r.user}</td><td>${r.model}</td><td>${r.client}</td><td>${fmtTime(r.startedAt)}</td></tr>`).join('');
+      $('active').innerHTML = status.active.map(r => `<tr><td>${escapeHTML(r.user)}</td><td>${escapeHTML(r.model)}</td><td>${escapeHTML(r.client)}</td><td>${fmtTime(r.startedAt)}</td><td class="actions"><button class="danger-btn" type="button" data-stop-request="${escapeHTML(r.id)}">Stop</button></td></tr>`).join('') || '<tr><td colspan="5">No active requests</td></tr>';
     }
 
     function renderModels() {
@@ -299,11 +425,12 @@
           <tr>
             <td class="model-name" data-copy-model="${escapeHTML(m.name)}" title="Click to copy">${escapeHTML(m.name)} ${downloading ? `<span class="download-badge">Downloading ${pullState.percent || 0}%</span>` : ''}</td>
             <td>${downloading ? (pullState.status || 'Downloading') : fmtBytes(m.size)}</td>
+            <td>${downloading ? '' : fmtDate(m.modified_at)}</td>
             <td class="actions">${downloading ? '<button class="ghost-btn" type="button" disabled>Installing</button>' : `<button class="danger-btn" type="button" data-delete-model="${escapeHTML(m.name)}">Delete</button>`}</td>
           </tr>
         `;
       });
-      $('models').innerHTML = rows.join('') || '<tr><td colspan="3">No models installed</td></tr>';
+      $('models').innerHTML = rows.join('') || '<tr><td colspan="4">No models installed</td></tr>';
       $('modelPageInfo').textContent = `${modelPage} / ${totalPages}`;
       $('modelPagerTop').textContent = `${visibleModels.length} total`;
       $('modelPrev').disabled = modelPage <= 1;
@@ -321,8 +448,11 @@
       const totalPages = Math.max(1, Math.ceil(records.length / usagePageSize));
       usagePage = Math.min(Math.max(1, usagePage), totalPages);
       const start = (usagePage - 1) * usagePageSize;
-      const rows = records.slice(start, start + usagePageSize).map(r => `<tr><td>${escapeHTML(r.user)}</td><td>${escapeHTML(r.model)}</td><td>${r.status}</td><td>${fmtDuration(r.duration)}</td><td>${escapeHTML(r.client)}</td></tr>`);
-      $('recent').innerHTML = rows.join('') || '<tr><td colspan="5">No usage records</td></tr>';
+      const rows = records.slice(start, start + usagePageSize).map(r => {
+        const ok = r.status >= 200 && r.status < 400 && !r.error;
+        return `<tr><td>${escapeHTML(r.user)}</td><td>${escapeHTML(r.model)}</td><td><span class="status-pill ${ok ? 'success' : 'error'}">${ok ? 'Success' : 'Failed'} ${r.status || ''}</span></td><td>${fmtDateTime(r.finishedAt || r.startedAt)}</td><td>${fmtDuration(r.duration)}</td><td>${escapeHTML(r.client)}</td><td class="actions"><button class="danger-btn" type="button" data-delete-usage="${escapeHTML(r.id)}">Delete</button></td></tr>`;
+      });
+      $('recent').innerHTML = rows.join('') || '<tr><td colspan="7">No usage records</td></tr>';
       $('usagePageInfo').textContent = `${usagePage} / ${totalPages} · ${records.length} records`;
       $('usagePrev').disabled = usagePage <= 1;
       $('usageNext').disabled = usagePage >= totalPages;
@@ -447,6 +577,146 @@
       `).join('');
     }
 
+    function normalizeBaseURL(value) {
+      const raw = String(value || '').trim().replace(/\/+$/, '');
+      if (!raw) return '';
+      return raw.endsWith('/v1') ? raw : `${raw}/v1`;
+    }
+
+    function selectCliTool(tool) {
+      selectedCliTool = tool;
+      document.querySelectorAll('[data-cli-tool]').forEach((button) => button.classList.toggle('active', button.dataset.cliTool === tool));
+    }
+
+    function selectAddressKind(kind) {
+      selectedAddressKind = kind;
+      document.querySelectorAll('[data-address-kind]').forEach((button) => button.classList.toggle('active', button.dataset.addressKind === kind));
+      $('customAddressWrap').classList.toggle('open', kind === 'custom');
+    }
+
+    async function loadCliExportOptions() {
+      $('cliExportStatus').textContent = 'Loading export options...';
+      cliExportOptions = await fetch('/api/export/cli-config/options').then(r => {
+        if (!r.ok) throw new Error('Failed to load export options');
+        return r.json();
+      }).catch((error) => ({error:error.message, models:[], addresses:{local:{available:false}, tailscale:{available:false}}}));
+      const local = cliExportOptions.addresses?.local || {};
+      const tailscale = cliExportOptions.addresses?.tailscale || {};
+      $('localAddressLabel').textContent = local.available ? local.baseURL : 'No private IP address detected.';
+      $('tailscaleAddressLabel').textContent = tailscale.available ? tailscale.baseURL : 'Tailscale is not available on this host.';
+      const tailscaleButton = document.querySelector('[data-address-kind="tailscale"]');
+      tailscaleButton.disabled = !tailscale.available;
+      if (selectedAddressKind === 'tailscale' && !tailscale.available) selectAddressKind(local.available ? 'local' : 'custom');
+      if (selectedAddressKind === 'local' && !local.available) selectAddressKind(tailscale.available ? 'tailscale' : 'custom');
+      $('cliExportStatus').textContent = cliExportOptions.error || `${(cliExportOptions.models || []).length} installed models will be exported.`;
+    }
+
+    function selectedBaseURL() {
+      if (selectedAddressKind === 'custom') return normalizeBaseURL($('customBaseURL').value);
+      return cliExportOptions?.addresses?.[selectedAddressKind]?.baseURL || '';
+    }
+
+    function cliModels() {
+      return (cliExportOptions?.models || []).filter(Boolean);
+    }
+
+    function selectedContextSize() {
+      const value = Number($('contextSize').value || 0);
+      return Number.isFinite(value) && value > 0 ? Math.round(value) : 32768;
+    }
+
+    function formatContextSize(value) {
+      return `${Math.round(Number(value || 0) / 1024)}K`;
+    }
+
+    function syncContextSize(value) {
+      const min = Number($('contextSizeDial').min);
+      const max = Number($('contextSizeDial').max);
+      const step = Number($('contextSizeDial').step);
+      const raw = Number(value || 32768);
+      const clamped = Math.min(max, Math.max(min, raw));
+      const rounded = Math.round(clamped / step) * step;
+      $('contextSize').value = rounded;
+      $('contextSizeDial').value = rounded;
+      $('contextSizeValue').textContent = formatContextSize(rounded);
+    }
+
+    function buildOpenCodeConfig(baseURL, models, contextSize) {
+      const entries = Object.fromEntries(models.map((name) => [name, {name, options: {num_ctx: contextSize}}]));
+      return {
+        $schema: 'https://opencode.ai/config.json',
+        provider: {
+          nucleus: {
+            npm: '@ai-sdk/openai-compatible',
+            name: 'Nucleus',
+            options: {baseURL},
+            models: entries
+          }
+        }
+      };
+    }
+
+    function buildOpenClawConfig(baseURL, models, contextSize) {
+      return {
+        models: {
+          mode: 'merge',
+          providers: {
+            nucleus: {
+              baseUrl: baseURL,
+              api: 'openai-completions',
+              models: models.map((name) => ({
+                id: name,
+                name,
+                reasoning: false,
+                input: ['text'],
+                contextWindow: contextSize,
+                contextTokens: contextSize
+              }))
+            }
+          }
+        }
+      };
+    }
+
+    function downloadJSON(filename, data) {
+      const blob = new Blob([`${JSON.stringify(data, null, 2)}\n`], {type:'application/json'});
+      const href = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = href;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(href);
+    }
+
+    function exportCliConfig() {
+      const baseURL = selectedBaseURL();
+      const models = cliModels();
+      if (!baseURL) {
+        $('cliExportStatus').textContent = 'Choose or enter a Nucleus address first.';
+        return;
+      }
+      if (!models.length) {
+        $('cliExportStatus').textContent = 'No installed models are available to export.';
+        return;
+      }
+      if (selectedCliTool === 'openclaw') {
+        downloadJSON('models.json', buildOpenClawConfig(baseURL, models, selectedContextSize()));
+      } else {
+        downloadJSON('opencode.json', buildOpenCodeConfig(baseURL, models, selectedContextSize()));
+      }
+      $('cliExportStatus').textContent = `Downloaded ${selectedCliTool === 'openclaw' ? 'models.json' : 'opencode.json'}.`;
+    }
+
+    $('openExportBtn').onclick = () => $('exportDialog').showModal();
+    $('closeExportBtn').onclick = () => $('exportDialog').close();
+    $('openCliExportBtn').onclick = () => {
+      $('exportDialog').close();
+      $('cliExportDialog').showModal();
+      loadCliExportOptions();
+    };
+    $('closeCliExportBtn').onclick = () => $('cliExportDialog').close();
     $('openDownloadBtn').onclick = () => {
       $('downloadDialog').showModal();
       setTimeout(() => $('modelName').focus(), 0);
@@ -463,6 +733,14 @@
     $('settingsUpdateBtn').onclick = startUpdate;
     $('launchAtLogin').addEventListener('change', saveSettings);
     $('autoCheckUpdate').addEventListener('change', saveSettings);
+    $('autoDeleteUsage').addEventListener('change', saveSettings);
+    $('usageRetentionHours').addEventListener('change', saveSettings);
+    document.querySelectorAll('[data-cli-tool]').forEach((button) => button.onclick = () => selectCliTool(button.dataset.cliTool));
+    document.querySelectorAll('[data-address-kind]').forEach((button) => button.onclick = () => selectAddressKind(button.dataset.addressKind));
+    $('downloadCliConfigBtn').onclick = exportCliConfig;
+    $('contextSizeDial').addEventListener('input', (event) => syncContextSize(event.target.value));
+    $('contextSize').addEventListener('change', (event) => syncContextSize(event.target.value));
+    syncContextSize($('contextSize').value);
 
     $('pullBtn').onclick = () => {
       pullModel($('modelName').value.trim());
@@ -509,6 +787,28 @@
         button.disabled = false;
       }
     });
+
+    $('active').addEventListener('click', async (event) => {
+      const button = event.target.closest('[data-stop-request]');
+      if (!button) return;
+      button.disabled = true;
+      await fetch('/api/requests/stop', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id:button.dataset.stopRequest})});
+      refresh();
+    });
+
+    $('recent').addEventListener('click', async (event) => {
+      const button = event.target.closest('[data-delete-usage]');
+      if (!button) return;
+      button.disabled = true;
+      await fetch('/api/usage/delete', {method:'DELETE', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id:button.dataset.deleteUsage})});
+      refresh();
+    });
+    $('usageClear').onclick = async () => {
+      if (!confirm('Delete all API usage records?')) return;
+      await fetch('/api/usage/clear', {method:'DELETE'});
+      usagePage = 1;
+      refresh();
+    };
 
     async function copyText(value) {
       if (navigator.clipboard?.writeText) {
@@ -579,7 +879,7 @@
     window.addEventListener('scroll', positionSuggestions, true);
 
     const source = new EventSource('/api/events');
-    ['request_started', 'request_finished', 'model_deleted', 'error'].forEach((name) => source.addEventListener(name, refresh));
+    ['request_started', 'request_finished', 'request_stopped', 'model_deleted', 'usage_deleted', 'usage_cleared', 'usage_auto_deleted', 'error'].forEach((name) => source.addEventListener(name, refresh));
     setInterval(refresh, 3000);
     refresh();
     loadSettings().then(() => {
@@ -592,12 +892,16 @@
       appSettings = data;
       $('launchAtLogin').checked = !!data.launchAtLogin;
       $('autoCheckUpdate').checked = !!data.autoCheckUpdate;
+      $('autoDeleteUsage').checked = !!data.autoDeleteUsage;
+      $('usageRetentionHours').value = data.usageRetentionHours || 72;
     }
 
     async function saveSettings() {
       const next = {
         launchAtLogin: $('launchAtLogin').checked,
-        autoCheckUpdate: $('autoCheckUpdate').checked
+        autoCheckUpdate: $('autoCheckUpdate').checked,
+        autoDeleteUsage: $('autoDeleteUsage').checked,
+        usageRetentionHours: Number($('usageRetentionHours').value || 72)
       };
       $('settingsStatus').textContent = 'Saving...';
       const response = await fetch('/api/settings', {
@@ -609,11 +913,15 @@
         $('settingsStatus').textContent = await response.text();
         $('launchAtLogin').checked = !!appSettings.launchAtLogin;
         $('autoCheckUpdate').checked = !!appSettings.autoCheckUpdate;
+        $('autoDeleteUsage').checked = !!appSettings.autoDeleteUsage;
+        $('usageRetentionHours').value = appSettings.usageRetentionHours || 72;
         return;
       }
       appSettings = await response.json();
       $('launchAtLogin').checked = !!appSettings.launchAtLogin;
       $('autoCheckUpdate').checked = !!appSettings.autoCheckUpdate;
+      $('autoDeleteUsage').checked = !!appSettings.autoDeleteUsage;
+      $('usageRetentionHours').value = appSettings.usageRetentionHours || 72;
       $('settingsStatus').textContent = 'Saved.';
     }
 

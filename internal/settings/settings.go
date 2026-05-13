@@ -13,8 +13,10 @@ import (
 const launchAgentLabel = "ai.nucleus.local"
 
 type Settings struct {
-	LaunchAtLogin   bool `json:"launchAtLogin"`
-	AutoCheckUpdate bool `json:"autoCheckUpdate"`
+	LaunchAtLogin       bool `json:"launchAtLogin"`
+	AutoCheckUpdate     bool `json:"autoCheckUpdate"`
+	AutoDeleteUsage     bool `json:"autoDeleteUsage"`
+	UsageRetentionHours int  `json:"usageRetentionHours"`
 }
 
 type Manager struct {
@@ -26,16 +28,22 @@ func New() *Manager {
 }
 
 func (m *Manager) Get() Settings {
-	cfg := Settings{AutoCheckUpdate: true}
+	cfg := Settings{AutoCheckUpdate: true, UsageRetentionHours: 72}
 	data, err := os.ReadFile(m.path)
 	if err == nil {
 		_ = json.Unmarshal(data, &cfg)
 	}
 	cfg.LaunchAtLogin = launchAgentInstalled()
+	if cfg.UsageRetentionHours <= 0 {
+		cfg.UsageRetentionHours = 72
+	}
 	return cfg
 }
 
 func (m *Manager) Save(cfg Settings) error {
+	if cfg.UsageRetentionHours <= 0 {
+		cfg.UsageRetentionHours = 72
+	}
 	if err := setLaunchAtLogin(cfg.LaunchAtLogin); err != nil {
 		return err
 	}
