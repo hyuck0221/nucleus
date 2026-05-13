@@ -53,10 +53,7 @@ exec "$APP_DIR/Resources/nucleus" serve
 SH
 chmod +x "$APP_DIR/Contents/MacOS/Nucleus"
 
-if command -v codesign >/dev/null 2>&1 && [[ -n "${CODE_SIGN_IDENTITY:-}" ]]; then
-  codesign --force --options runtime --timestamp --sign "$CODE_SIGN_IDENTITY" "$APP_DIR/Contents/Resources/nucleus" >/dev/null
-  codesign --force --deep --options runtime --timestamp --sign "$CODE_SIGN_IDENTITY" "$APP_DIR" >/dev/null
-elif command -v codesign >/dev/null 2>&1; then
+if command -v codesign >/dev/null 2>&1; then
   codesign --force --deep --sign - "$APP_DIR" >/dev/null
 fi
 
@@ -69,14 +66,5 @@ hdiutil create \
   -ov \
   -format UDZO \
   "$DMG_PATH" >/dev/null
-
-if command -v codesign >/dev/null 2>&1 && [[ -n "${CODE_SIGN_IDENTITY:-}" ]]; then
-  codesign --force --timestamp --sign "$CODE_SIGN_IDENTITY" "$DMG_PATH" >/dev/null
-fi
-
-if command -v xcrun >/dev/null 2>&1 && [[ -n "${NOTARY_PROFILE:-}" ]]; then
-  xcrun notarytool submit "$DMG_PATH" --keychain-profile "$NOTARY_PROFILE" --wait >/dev/null
-  xcrun stapler staple "$DMG_PATH" >/dev/null
-fi
 
 echo "$DMG_PATH"
