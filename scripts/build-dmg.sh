@@ -40,45 +40,25 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
   <string>Nucleus</string>
   <key>LSMinimumSystemVersion</key>
   <string>13.0</string>
-  <key>LSUIElement</key>
+  <key>NSHighResolutionCapable</key>
   <true/>
 </dict>
 </plist>
 PLIST
 
-cat > "$APP_DIR/Contents/MacOS/Nucleus" <<'SH'
-#!/bin/sh
-APP_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-BIN="$APP_DIR/Resources/nucleus"
-LOG_DIR="$HOME/Library/Logs/Nucleus"
-LOG_FILE="$LOG_DIR/nucleus.log"
-DASHBOARD_URL="http://127.0.0.1:8787"
+case "$ARCH" in
+  arm64) SWIFT_TARGET="arm64-apple-macos13.0" ;;
+  amd64) SWIFT_TARGET="x86_64-apple-macos13.0" ;;
+  *) echo "unsupported arch: $ARCH" >&2; exit 2 ;;
+esac
 
-mkdir -p "$LOG_DIR"
-
-if /usr/bin/curl -fsS "$DASHBOARD_URL/api/status" >/dev/null 2>&1; then
-  /usr/bin/open "$DASHBOARD_URL"
-  exit 0
-fi
-
-"$BIN" serve >> "$LOG_FILE" 2>&1 &
-SERVER_PID="$!"
-
-for _ in 1 2 3 4 5 6 7 8 9 10; do
-  if /usr/bin/curl -fsS "$DASHBOARD_URL/api/status" >/dev/null 2>&1; then
-    /usr/bin/open "$DASHBOARD_URL"
-    exit 0
-  fi
-  if ! /bin/kill -0 "$SERVER_PID" >/dev/null 2>&1; then
-    /usr/bin/open -a Console "$LOG_FILE" >/dev/null 2>&1
-    exit 1
-  fi
-  /bin/sleep 0.5
-done
-
-/usr/bin/open "$DASHBOARD_URL"
-SH
-chmod +x "$APP_DIR/Contents/MacOS/Nucleus"
+xcrun swiftc \
+  -target "$SWIFT_TARGET" \
+  -O \
+  -framework AppKit \
+  -framework WebKit \
+  macos/NucleusApp.swift \
+  -o "$APP_DIR/Contents/MacOS/Nucleus"
 
 if command -v codesign >/dev/null 2>&1; then
   codesign --force --deep --sign - "$APP_DIR" >/dev/null
