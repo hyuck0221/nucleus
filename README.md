@@ -1,140 +1,200 @@
-# Nucleus
+<p align="center">
+  <img src="assets/icons/app-icon.png" alt="Nucleus logo" width="128">
+</p>
 
-[한국어](README.ko.md)
+<h1 align="center">Nucleus</h1>
 
-Nucleus is a macOS-friendly local AI orchestrator. It runs beside Ollama, exposes an OpenAI-compatible API, and provides a live dashboard for local model state and API usage.
+<p align="center">
+  Run local LLMs on macOS, expose them through an OpenAI-compatible API, and monitor everything from one dashboard.
+</p>
 
-## Features
+<p align="center">
+  <a href="README.ko.md">한국어</a>
+</p>
 
-- Ollama status, model listing, and model pull commands
-- OpenAI-compatible `GET /v1/models` and `POST /v1/chat/completions`
-- Real-time dashboard at `http://127.0.0.1:8787`
-- Tracks active callers, recent users, recent models, client headers, status, and latency
-- SSE event stream at `/api/events` for monitoring integrations
-- Model download dialog with Ollama library pull and Hugging Face GGUF search
-- Single Go binary suitable for macOS LaunchAgent or developer CLI usage
+---
 
-## Quick Start
+## What Nucleus does
+
+Nucleus is a macOS app for people who want one place to:
+
+- install and run local models through Ollama
+- provide an OpenAI-compatible API for other tools
+- monitor who is using which model in real time
+- manage models, update checks, and usage history from a dashboard
+
+Open the app, choose a model, and use it locally or from another machine on your network.
+
+## 1. Install
+
+### Install Ollama first
+
+Nucleus uses Ollama as the local model runtime, so Ollama must be installed and running before models can be used.
 
 ```bash
 brew install ollama
 ollama serve
-
-go run ./cmd/nucleus pull llama3.2
-go run ./cmd/nucleus serve
 ```
 
-Open `http://127.0.0.1:8787`.
+### Install Nucleus on macOS
 
-Call it from any OpenAI-compatible client:
+1. Download the latest DMG from GitHub Releases.
+2. Open the DMG.
+3. Drag `Nucleus.app` into `Applications`.
+4. Launch the app.
 
-```bash
-curl http://127.0.0.1:8787/v1/chat/completions \
-  -H 'Content-Type: application/json' \
-  -H 'X-Nucleus-User: shim' \
-  -H 'X-Nucleus-Client: opencode' \
-  -d '{
-    "model": "llama3.2",
-    "messages": [{"role": "user", "content": "Say hello from local AI"}]
-  }'
-```
-
-## CLI
-
-```bash
-nucleus serve
-nucleus status
-nucleus models
-nucleus pull llama3.2
-nucleus version
-```
-
-## Tailscale Access
-
-By default, `nucleus serve` listens on `0.0.0.0:8787`, so it accepts requests through localhost, LAN, and Tailscale interfaces.
-
-```bash
-nucleus serve
-```
-
-Check the active listener:
-
-```bash
-lsof -nP -iTCP:8787 -sTCP:LISTEN
-```
-
-It should show `*:8787` or `0.0.0.0:8787`.
-
-For local-only access, run:
-
-```bash
-nucleus serve --addr 127.0.0.1:8787
-```
-
-## macOS DMG
-
-Tagged releases attach both CLI tarballs and installable DMG files:
-
-- `Nucleus-<version>-darwin-arm64.dmg`
-- `Nucleus-<version>-darwin-amd64.dmg`
-
-Open the DMG, drag `Nucleus.app` to `Applications`, then launch it. The app starts the local server with the default `0.0.0.0:8787` listener and shows the dashboard in a native macOS WebView window. App logs are written to `~/Library/Logs/Nucleus/nucleus.log`.
-
-GitHub release DMGs are ad-hoc signed and not notarized. On first launch, macOS may block the app because it is distributed outside Apple notarization. If you trust the GitHub release, remove the quarantine attribute after dragging the app to Applications:
+Because Nucleus is distributed through GitHub and not Apple notarization, macOS may block the first launch. If you trust the release, remove the quarantine attribute and open it again:
 
 ```bash
 xattr -dr com.apple.quarantine /Applications/Nucleus.app
 open /Applications/Nucleus.app
 ```
 
-## macOS LaunchAgent
+When the app opens, the local server starts automatically and the dashboard appears in a macOS window.
 
-Build and install the binary somewhere stable:
+## 2. Use the dashboard
+
+The dashboard is the easiest way to operate Nucleus.
+
+- Download models from the Ollama library
+- Search and install GGUF models from Hugging Face
+- See download progress directly in the model list
+- Delete models with confirmation
+- Copy model names with one click
+- Review active requests and force-stop them when needed
+- Inspect API usage history, success or failure status, timestamps, and client information
+- Clear usage records manually or configure automatic cleanup in Settings
+
+The app serves the dashboard and API on:
+
+```text
+http://127.0.0.1:8787
+```
+
+By default, the server listens on `0.0.0.0:8787`, so LAN and Tailscale access can also work when the machine allows inbound traffic.
+
+## 3. Call the API
+
+Nucleus exposes an OpenAI-compatible chat endpoint:
 
 ```bash
-go build -o /usr/local/bin/nucleus ./cmd/nucleus
+curl http://127.0.0.1:8787/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -H 'X-Nucleus-User: tester' \
+  -H 'X-Nucleus-Client: curl' \
+  -d '{
+    "model": "llama3.2",
+    "messages": [
+      {"role": "user", "content": "Say hello from local AI"}
+    ]
+  }'
 ```
 
-Create `~/Library/LaunchAgents/com.nucleus.ai.plist`:
+Useful endpoints:
 
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key><string>com.nucleus.ai</string>
-  <key>ProgramArguments</key>
-  <array>
-    <string>/usr/local/bin/nucleus</string>
-    <string>serve</string>
-  </array>
-  <key>RunAtLoad</key><true/>
-  <key>KeepAlive</key><true/>
-  <key>StandardOutPath</key><string>/tmp/nucleus.log</string>
-  <key>StandardErrorPath</key><string>/tmp/nucleus.err</string>
-</dict>
-</plist>
+- `GET /v1/models`
+- `POST /v1/chat/completions`
+
+For live token streaming, send:
+
+```json
+{
+  "stream": true
+}
 ```
 
-Then load it:
+The dashboard records:
+
+- user name from `X-Nucleus-User`, `X-User`, or `X-Forwarded-User`
+- client name from `X-Nucleus-Client` or `User-Agent`
+
+That makes remote usage visible without requiring a separate analytics stack.
+
+## 4. Connect OpenCode
+
+The simplest route is the built-in export flow:
+
+1. Open Nucleus.
+2. Choose `Export`.
+3. Select `CLI .json config file export`.
+4. Pick `OpenCode`.
+5. Choose the Nucleus address you want to use.
+6. Download `opencode.json`.
+7. Place it in the OpenCode project root.
+
+Nucleus generates an OpenAI-compatible provider config using the detected local or Tailscale address.
+
+OpenCode supports custom providers through `@ai-sdk/openai-compatible` and a custom `baseURL`, which is exactly what Nucleus exports.
+
+## 5. Connect OpenClaw
+
+Nucleus also exports an OpenClaw provider file:
+
+1. Open Nucleus.
+2. Choose `Export`.
+3. Select `CLI .json config file export`.
+4. Pick `OpenClaw`.
+5. Choose the Nucleus address.
+6. Download `models.json`.
+7. Merge that provider block into your OpenClaw model configuration.
+
+The generated file uses a custom provider with:
+
+- `baseUrl` pointing to Nucleus
+- `api: "openai-completions"`
+- the locally installed Nucleus models
+
+OpenClaw documents custom OpenAI-compatible local proxies in this style. Its docs also note that proxy-style OpenAI routes differ from native provider integrations, especially around advanced runtime behavior and some tool-calling expectations.
+
+## 6. Helpful notes
+
+### Tailscale access
+
+If you want to call Nucleus from another device over Tailscale:
+
+1. Keep Nucleus running.
+2. Confirm it is listening on `0.0.0.0:8787`.
+3. Use your Tailscale DNS name or Tailscale IP.
+
+Example:
 
 ```bash
-launchctl load ~/Library/LaunchAgents/com.nucleus.ai.plist
+curl http://your-mac.tailnet-name.ts.net:8787/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -H 'X-Nucleus-User: tester' \
+  -H 'X-Nucleus-Client: remote-cli' \
+  -d '{
+    "model": "llama3.2",
+    "messages": [
+      {"role": "user", "content": "Hello from another machine"}
+    ]
+  }'
 ```
 
-## Client Identity
+If it does not connect:
 
-Nucleus records identity from these headers:
+- check that Nucleus is running
+- check macOS firewall rules
+- confirm Tailscale connectivity
+- verify that port `8787` is listening
 
-- `X-Nucleus-User`, `X-User`, or `X-Forwarded-User`
-- `X-Nucleus-Client` or `User-Agent`
+```bash
+lsof -nP -iTCP:8787 -sTCP:LISTEN
+```
 
-This keeps the API simple for tools like opencode while still making dashboard usage visible.
+### Ollama is required
 
-## Model Downloads
+Nucleus manages and proxies local models, but Ollama remains the actual model runtime. If Ollama is stopped, model listing and inference will not work.
 
-Use the dashboard `Download model` button to pull models from the Ollama library or search Hugging Face GGUF repositories. Hugging Face results are downloaded through Ollama using names like `hf.co/bartowski/Llama-3.2-1B-Instruct-GGUF`.
+### Settings worth knowing
 
-## Settings
+In Settings, you can:
 
-Use `Settings` in the top bar to enable opening Nucleus at login, toggle automatic update checks, or manually check the latest GitHub release. Login startup is managed with `~/Library/LaunchAgents/ai.nucleus.local.plist`.
+- launch Nucleus automatically at login
+- check for new versions
+- install an update from inside the app
+- automatically delete older API usage history after a retention period
+
+## License
+
+MIT License. See `LICENSE`.
