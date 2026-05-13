@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="/assets/icons/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="icon" href="/assets/icons/favicon-16.png" sizes="16x16" type="image/png">
+  <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png">
+  <title>Nucleus</title>
+  <style>
+    :root { color-scheme: light dark; --bg:#101214; --panel:#181b1f; --muted:#8e9aa8; --text:#eef2f5; --line:#2a3038; --ok:#40d98b; --warn:#ffbd4a; --bad:#ff6470; --accent:#63b3ff; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",sans-serif; background:var(--bg); color:var(--text); }
+    header { display:flex; align-items:center; justify-content:space-between; padding:18px 22px; border-bottom:1px solid var(--line); background:#14171a; position:sticky; top:0; z-index:2; }
+    h1 { display:flex; align-items:center; gap:10px; font-size:19px; margin:0; letter-spacing:0; }
+    .brand-logo { width:28px; height:28px; border-radius:6px; display:block; }
+    button, input { font:inherit; }
+    main { padding:22px; display:grid; gap:18px; max-width:1280px; margin:0 auto; }
+    .grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; }
+    .panel { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:16px; min-width:0; }
+    .metric { color:var(--muted); font-size:13px; margin-bottom:8px; }
+    .value { font-size:24px; font-weight:700; overflow-wrap:anywhere; }
+    .ok { color:var(--ok); } .warn { color:var(--warn); } .bad { color:var(--bad); }
+    .toolbar { display:flex; gap:8px; flex-wrap:wrap; align-items:flex-start; }
+    .model-search { position:relative; min-width:220px; }
+    input { background:#0f1114; color:var(--text); border:1px solid var(--line); border-radius:7px; padding:9px 10px; width:100%; min-width:0; }
+    button { background:var(--accent); color:#071019; border:0; border-radius:7px; padding:9px 12px; font-weight:700; cursor:pointer; }
+    button:disabled { cursor:not-allowed; opacity:.62; }
+    .ghost-btn { background:#222933; color:var(--text); border:1px solid var(--line); padding:6px 9px; font-size:12px; }
+    .danger-btn { background:#342028; color:#ffd8de; border:1px solid #5d2f3b; padding:6px 9px; font-size:12px; }
+    .suggestions { position:fixed; top:0; left:0; width:220px; max-height:min(340px,calc(100vh - 88px)); background:#101318; border:1px solid var(--line); border-radius:8px; box-shadow:0 16px 42px rgba(0,0,0,.32); overflow:auto; display:none; z-index:20; }
+    .suggestions.open { display:block; }
+    .suggestion { width:100%; display:grid; grid-template-columns:1fr auto; gap:6px 12px; align-items:center; background:transparent; color:var(--text); border:0; border-bottom:1px solid var(--line); border-radius:0; padding:10px 12px; text-align:left; cursor:pointer; }
+    .suggestion:last-child { border-bottom:0; }
+    .suggestion:hover, .suggestion:focus { background:#19202a; outline:none; }
+    .suggestion strong { font-size:13px; }
+    .suggestion span { color:var(--muted); font-size:12px; grid-column:1 / -1; }
+    .badge { color:#071019; background:var(--ok); border-radius:999px; padding:2px 7px; font-size:11px; font-weight:700; }
+    dialog { width:min(760px,calc(100vw - 32px)); max-height:calc(100vh - 32px); padding:0; color:var(--text); background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:0 24px 70px rgba(0,0,0,.45); }
+    dialog::backdrop { background:rgba(0,0,0,.52); }
+    .dialog-head { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px 18px; border-bottom:1px solid var(--line); }
+    .dialog-title { font-size:16px; font-weight:800; }
+    .dialog-body { padding:18px; display:grid; gap:16px; overflow:auto; max-height:calc(100vh - 110px); }
+    .download-section { display:grid; gap:10px; }
+    .section-title { color:var(--muted); font-size:13px; font-weight:700; }
+    .download-row { display:grid; grid-template-columns:minmax(220px,1fr) auto; gap:8px; align-items:start; }
+    .hf-results { display:grid; gap:6px; max-height:min(280px,32vh); overflow:auto; padding-right:4px; }
+    .hf-card { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:6px 10px; align-items:center; padding:9px 10px; border:1px solid var(--line); border-radius:7px; background:#12161b; min-height:58px; }
+    .hf-card strong { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:13px; line-height:1.25; }
+    .hf-meta { color:var(--muted); font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .hf-empty { color:var(--muted); font-size:13px; padding:10px 0; }
+    .progress-panel { display:none; gap:10px; }
+    .progress-panel.open { display:grid; }
+    .progress-head { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    .progress-title { font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .progress-status { color:var(--muted); font-size:12px; text-align:right; }
+    .progress-track { width:100%; height:10px; background:#0d1014; border:1px solid var(--line); border-radius:999px; overflow:hidden; }
+    .progress-fill { height:100%; width:0; background:linear-gradient(90deg,var(--accent),var(--ok)); transition:width .18s ease; }
+    .progress-detail { color:var(--muted); font-size:12px; min-height:16px; }
+    table { width:100%; border-collapse:collapse; table-layout:fixed; }
+    th, td { text-align:left; border-bottom:1px solid var(--line); padding:10px 8px; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    td.actions { text-align:right; }
+    th { color:var(--muted); font-weight:600; }
+    .span2 { grid-column:span 2; }
+    .span4 { grid-column:span 4; }
+    @media (max-width:900px) { .grid { grid-template-columns:1fr; } .span2,.span4 { grid-column:auto; } header { align-items:flex-start; gap:10px; flex-direction:column; } .toolbar, .download-row, .model-search { width:100%; grid-template-columns:1fr; } #pullBtn, #hfSearchBtn { width:100%; } .hf-results { max-height:240px; } .hf-card { grid-template-columns:minmax(0,1fr) auto; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1><img class="brand-logo" src="/assets/icons/favicon-32.png" alt="">Nucleus</h1>
+    <div class="toolbar">
+      <button id="openDownloadBtn">Download model</button>
+    </div>
+  </header>
+  <dialog id="downloadDialog">
+    <div class="dialog-head">
+      <div class="dialog-title">Download model</div>
+      <button id="closeDownloadBtn" class="ghost-btn" type="button">Close</button>
+    </div>
+    <div class="dialog-body">
+      <div class="download-section">
+        <div class="section-title">Ollama library or direct model name</div>
+        <div class="download-row">
+          <div class="model-search">
+            <input id="modelName" placeholder="llama3.2 or hf.co/user/model-GGUF" autocomplete="off" aria-label="Model name" aria-controls="suggestions">
+            <div id="suggestions" class="suggestions" role="listbox"></div>
+          </div>
+          <button id="pullBtn" type="button">Pull</button>
+        </div>
+      </div>
+      <div class="download-section">
+        <div class="section-title">Search Hugging Face GGUF models</div>
+        <div class="download-row">
+          <input id="hfQuery" placeholder="llama 3.2 3b instruct" autocomplete="off" aria-label="Hugging Face search">
+          <button id="hfSearchBtn" type="button">Search</button>
+        </div>
+        <div id="hfResults" class="hf-results"><div class="hf-empty">Search Hugging Face models and download with Ollama.</div></div>
+      </div>
+      <div id="pullProgress" class="panel progress-panel">
+        <div class="progress-head">
+          <div id="pullTitle" class="progress-title">Installing model</div>
+          <div id="pullPercent" class="progress-status">0%</div>
+        </div>
+        <div class="progress-track"><div id="pullFill" class="progress-fill"></div></div>
+        <div id="pullDetail" class="progress-detail"></div>
+      </div>
+    </div>
+  </dialog>
+  <main>
+    <section class="grid">
+      <div class="panel"><div class="metric">Ollama</div><div id="ollama" class="value warn">checking</div></div>
+      <div class="panel"><div class="metric">Active users</div><div id="activeUsers" class="value">0</div></div>
+      <div class="panel"><div class="metric">Active requests</div><div id="activeRequests" class="value">0</div></div>
+      <div class="panel"><div class="metric">Recent model</div><div id="recentModel" class="value">none</div></div>
+      <div class="panel span2">
+        <div class="metric">Installed models</div>
+        <table><thead><tr><th>Model</th><th>Size</th><th></th></tr></thead><tbody id="models"></tbody></table>
+      </div>
+      <div class="panel span2">
+        <div class="metric">Active now</div>
+        <table><thead><tr><th>User</th><th>Model</th><th>Client</th><th>Started</th></tr></thead><tbody id="active"></tbody></table>
+      </div>
+      <div class="panel span4">
+        <div class="metric">Recent API usage</div>
+        <table><thead><tr><th>User</th><th>Model</th><th>Status</th><th>Duration</th><th>Client</th></tr></thead><tbody id="recent"></tbody></table>
+      </div>
+    </section>
+  </main>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const fmtBytes = (n) => n ? `${(n/1024/1024/1024).toFixed(1)} GB` : "";
+    const fmtTime = (v) => v ? new Date(v).toLocaleTimeString() : "";
+    const fmtDuration = (ns) => ns ? `${(ns / 1e9).toFixed(2)}s` : "";
+    const escapeHTML = (value) => String(value).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    let pullState = null;
+    let hfSearchTimer = null;
+
+    async function refresh() {
+      const [status, models] = await Promise.all([
+        fetch('/api/status').then(r => r.json()),
+        fetch('/api/models').then(r => r.ok ? r.json() : {models: []})
+      ]);
+      $('ollama').textContent = status.ollama.reachable ? 'online' : (status.ollama.installed ? 'offline' : 'missing');
+      $('ollama').className = `value ${status.ollama.reachable ? 'ok' : 'bad'}`;
+      $('activeRequests').textContent = status.active.length;
+      $('activeUsers').textContent = new Set(status.active.map(r => r.user)).size;
+      $('recentModel').textContent = status.recent[0]?.model || 'none';
+      $('models').innerHTML = models.models.map(m => `
+        <tr>
+          <td>${escapeHTML(m.name)}</td>
+          <td>${fmtBytes(m.size)}</td>
+          <td class="actions"><button class="danger-btn" type="button" data-delete-model="${escapeHTML(m.name)}">Delete</button></td>
+        </tr>
+      `).join('');
+      $('active').innerHTML = status.active.map(r => `<tr><td>${r.user}</td><td>${r.model}</td><td>${r.client}</td><td>${fmtTime(r.startedAt)}</td></tr>`).join('');
+      $('recent').innerHTML = status.recent.map(r => `<tr><td>${r.user}</td><td>${r.model}</td><td>${r.status}</td><td>${fmtDuration(r.duration)}</td><td>${r.client}</td></tr>`).join('');
+    }
+
+    function setPullProgress(name, update) {
+      const completed = Number(update.completed || 0);
+      const total = Number(update.total || 0);
+      const percent = total > 0 ? Math.max(0, Math.min(100, Math.round((completed / total) * 100))) : 0;
+      const status = update.status || 'Installing';
+      pullState = {name, percent, status};
+      $('pullProgress').classList.add('open');
+      $('pullTitle').textContent = `Installing ${name}`;
+      $('pullPercent').textContent = total > 0 ? `${percent}%` : status;
+      $('pullFill').style.width = `${percent}%`;
+      $('pullDetail').textContent = total > 0 ? `${status} · ${fmtBytes(completed)} / ${fmtBytes(total)}` : status;
+    }
+
+    function finishPullProgress(name, ok, detail) {
+      pullState = null;
+      $('pullTitle').textContent = ok ? `Installed ${name}` : `Install failed: ${name}`;
+      $('pullPercent').textContent = ok ? 'Done' : 'Error';
+      $('pullFill').style.width = ok ? '100%' : '0%';
+      $('pullDetail').textContent = detail || '';
+      setTimeout(() => {
+        if (!pullState) $('pullProgress').classList.remove('open');
+      }, ok ? 2200 : 5000);
+    }
+
+    async function refreshSuggestions() {
+      const q = $('modelName').value.trim();
+      if (!q) {
+        $('suggestions').classList.remove('open');
+        $('suggestions').innerHTML = '';
+        return;
+      }
+      const data = await fetch(`/api/model-suggestions?q=${encodeURIComponent(q)}`).then(r => r.json()).catch(() => ({suggestions: []}));
+      const items = data.suggestions || [];
+      $('suggestions').innerHTML = items.map((item) => `
+        <button class="suggestion" type="button" role="option" data-name="${escapeHTML(item.name)}">
+          <strong>${escapeHTML(item.name)}</strong>
+          ${item.installed ? '<em class="badge">Installed</em>' : ''}
+          <span>${escapeHTML(item.description)}</span>
+        </button>
+      `).join('');
+      $('suggestions').classList.toggle('open', items.length > 0 && document.activeElement === $('modelName'));
+      positionSuggestions();
+    }
+
+    function positionSuggestions() {
+      const input = $('modelName');
+      const suggestions = $('suggestions');
+      if (!suggestions.classList.contains('open')) return;
+      const rect = input.getBoundingClientRect();
+      const margin = 12;
+      const availableWidth = window.innerWidth - margin * 2;
+      const width = Math.min(Math.max(rect.width, 220), availableWidth);
+      const left = Math.min(Math.max(rect.left, margin), window.innerWidth - width - margin);
+      suggestions.style.left = `${left}px`;
+      suggestions.style.top = `${rect.bottom + 6}px`;
+      suggestions.style.width = `${width}px`;
+    }
+
+    async function pullModel(name) {
+      if (!name) return;
+      $('pullBtn').disabled = true;
+      $('suggestions').classList.remove('open');
+      setPullProgress(name, {status: 'Starting download'});
+      try {
+        const response = await fetch('/api/models/pull', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name})});
+        if (!response.ok || !response.body) throw new Error(await response.text());
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        while (true) {
+          const {done, value} = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, {stream:true});
+          const lines = buffer.split('\n');
+          buffer = lines.pop();
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            const update = JSON.parse(line);
+            setPullProgress(name, update);
+          }
+        }
+        finishPullProgress(name, true, 'Model is ready to use.');
+      } catch (error) {
+        finishPullProgress(name, false, error.message);
+      } finally {
+        $('pullBtn').disabled = false;
+        refresh();
+      }
+    }
+
+    async function searchHuggingFace() {
+      const q = $('hfQuery').value.trim();
+      $('hfResults').innerHTML = '<div class="hf-empty">Searching Hugging Face...</div>';
+      const data = await fetch(`/api/huggingface/models?q=${encodeURIComponent(q)}`).then(r => {
+        if (!r.ok) throw new Error('Hugging Face search failed');
+        return r.json();
+      }).catch((error) => ({models: [], error: error.message}));
+      if (data.error) {
+        $('hfResults').innerHTML = `<div class="hf-empty">${escapeHTML(data.error)}</div>`;
+        return;
+      }
+      const models = data.models || [];
+      if (!models.length) {
+        $('hfResults').innerHTML = '<div class="hf-empty">No GGUF models found.</div>';
+        return;
+      }
+      $('hfResults').innerHTML = models.map((model) => `
+        <div class="hf-card">
+          <div>
+            <strong title="${escapeHTML(model.id)}">${escapeHTML(model.id)}</strong>
+            <div class="hf-meta">${model.downloads || 0} downloads · ${model.likes || 0} likes · ${escapeHTML(model.pullName)}</div>
+          </div>
+          <button class="ghost-btn" type="button" data-pull-model="${escapeHTML(model.pullName)}">Download</button>
+        </div>
+      `).join('');
+    }
+
+    $('openDownloadBtn').onclick = () => {
+      $('downloadDialog').showModal();
+      setTimeout(() => $('modelName').focus(), 0);
+    };
+    $('closeDownloadBtn').onclick = () => $('downloadDialog').close();
+
+    $('pullBtn').onclick = () => {
+      pullModel($('modelName').value.trim());
+    };
+
+    $('hfSearchBtn').onclick = searchHuggingFace;
+    $('hfQuery').addEventListener('input', () => {
+      clearTimeout(hfSearchTimer);
+      hfSearchTimer = setTimeout(searchHuggingFace, 350);
+    });
+    $('hfQuery').addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') searchHuggingFace();
+    });
+    $('hfResults').addEventListener('click', (event) => {
+      const button = event.target.closest('[data-pull-model]');
+      if (!button) return;
+      const name = button.dataset.pullModel;
+      $('modelName').value = name;
+      pullModel(name);
+    });
+
+    $('models').addEventListener('click', async (event) => {
+      const button = event.target.closest('[data-delete-model]');
+      if (!button) return;
+      const name = button.dataset.deleteModel;
+      if (!confirm(`Delete model "${name}"? This will remove it from local Ollama storage.`)) return;
+      button.disabled = true;
+      try {
+        const response = await fetch('/api/models/delete', {method:'DELETE', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name})});
+        if (!response.ok) throw new Error(await response.text());
+        refresh();
+        refreshSuggestions();
+      } catch (error) {
+        alert(`Failed to delete "${name}": ${error.message}`);
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    $('modelName').addEventListener('input', refreshSuggestions);
+    $('modelName').addEventListener('focus', refreshSuggestions);
+    $('modelName').addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') $('suggestions').classList.remove('open');
+      if (event.key === 'Enter' && $('suggestions .suggestion')) {
+        $('modelName').value = $('suggestions .suggestion').dataset.name;
+        $('suggestions').classList.remove('open');
+      }
+    });
+    $('suggestions').addEventListener('mousedown', (event) => {
+      const item = event.target.closest('.suggestion');
+      if (!item) return;
+      event.preventDefault();
+      $('modelName').value = item.dataset.name;
+      $('suggestions').classList.remove('open');
+      $('modelName').focus();
+    });
+    document.addEventListener('click', (event) => {
+      if (!event.target.closest('.model-search')) $('suggestions').classList.remove('open');
+    });
+    window.addEventListener('resize', positionSuggestions);
+    window.addEventListener('scroll', positionSuggestions, true);
+
+    const source = new EventSource('/api/events');
+    ['request_started', 'request_finished', 'model_deleted', 'error'].forEach((name) => source.addEventListener(name, refresh));
+    setInterval(refresh, 3000);
+    refresh();
+  </script>
+</body>
+</html>

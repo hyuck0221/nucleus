@@ -1,0 +1,46 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build and release
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Test
+        run: go test ./...
+
+      - name: Build macOS binaries
+        env:
+          VERSION: ${{ github.ref_name }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          mkdir -p dist
+          DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          for arch in arm64 amd64; do
+            GOOS=darwin GOARCH="$arch" go build \
+              -ldflags "-s -w -X github.com/shimhyuck/nucleus/internal/version.Version=$VERSION -X github.com/shimhyuck/nucleus/internal/version.Commit=$COMMIT -X github.com/shimhyuck/nucleus/internal/version.Date=$DATE" \
+              -o "dist/nucleus-darwin-$arch" ./cmd/nucleus
+            tar -C dist -czf "dist/nucleus-darwin-$arch.tar.gz" "nucleus-darwin-$arch"
+          done
+          shasum -a 256 dist/*.tar.gz > dist/checksums.txt
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            dist/*.tar.gz
+            dist/checksums.txt
