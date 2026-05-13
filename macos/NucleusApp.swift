@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 import WebKit
 
-final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDelegate {
     private var window: NSWindow?
     private var webView: WKWebView?
     private var serverProcess: Process?
@@ -37,6 +37,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         configuration.defaultWebpagePreferences.allowsContentJavaScript = true
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = self
+        webView.uiDelegate = self
         self.webView = webView
 
         let window = NSWindow(
@@ -120,6 +121,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         alert.informativeText = message
         alert.alertStyle = .warning
         alert.runModal()
+    }
+
+    func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {
+        let alert = NSAlert()
+        alert.messageText = "Nucleus"
+        alert.informativeText = message
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
+        completionHandler()
+    }
+
+    func webView(_ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping (Bool) -> Void) {
+        let alert = NSAlert()
+        alert.messageText = "Nucleus"
+        alert.informativeText = message
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Delete")
+        alert.addButton(withTitle: "Cancel")
+        completionHandler(alert.runModal() == .alertFirstButtonReturn)
     }
 }
 

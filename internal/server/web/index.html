@@ -10,7 +10,7 @@
   <style>
     :root { color-scheme: light dark; --bg:#101214; --panel:#181b1f; --muted:#8e9aa8; --text:#eef2f5; --line:#2a3038; --ok:#40d98b; --warn:#ffbd4a; --bad:#ff6470; --accent:#63b3ff; }
     * { box-sizing: border-box; }
-    body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",sans-serif; background:var(--bg); color:var(--text); }
+    body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",sans-serif; background:var(--bg); color:var(--text); user-select:none; -webkit-user-select:none; }
     header { display:flex; align-items:center; justify-content:space-between; padding:18px 22px; border-bottom:1px solid var(--line); background:#14171a; position:sticky; top:0; z-index:2; }
     h1 { display:flex; align-items:center; gap:10px; font-size:19px; margin:0; letter-spacing:0; }
     .brand-logo { width:28px; height:28px; border-radius:6px; display:block; }
@@ -23,7 +23,7 @@
     .ok { color:var(--ok); } .warn { color:var(--warn); } .bad { color:var(--bad); }
     .toolbar { display:flex; gap:8px; flex-wrap:wrap; align-items:flex-start; }
     .model-search { position:relative; min-width:220px; }
-    input { background:#0f1114; color:var(--text); border:1px solid var(--line); border-radius:7px; padding:9px 10px; width:100%; min-width:0; }
+    input { background:#0f1114; color:var(--text); border:1px solid var(--line); border-radius:7px; padding:9px 10px; width:100%; min-width:0; user-select:text; -webkit-user-select:text; }
     button { background:var(--accent); color:#071019; border:0; border-radius:7px; padding:9px 12px; font-weight:700; cursor:pointer; }
     button:disabled { cursor:not-allowed; opacity:.62; }
     .ghost-btn { background:#222933; color:var(--text); border:1px solid var(--line); padding:6px 9px; font-size:12px; }
@@ -44,12 +44,26 @@
     .suggestion strong { font-size:13px; }
     .suggestion span { color:var(--muted); font-size:12px; grid-column:1 / -1; }
     .badge { color:#071019; background:var(--ok); border-radius:999px; padding:2px 7px; font-size:11px; font-weight:700; }
+    .model-name { cursor:pointer; color:#d9ecff; }
+    .model-name:hover { color:#fff; }
+    .download-badge { color:#071019; background:var(--warn); border-radius:999px; padding:2px 7px; font-size:11px; font-weight:700; }
     dialog { width:min(760px,calc(100vw - 32px)); max-height:calc(100vh - 32px); padding:0; color:var(--text); background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:0 24px 70px rgba(0,0,0,.45); }
     dialog::backdrop { background:rgba(0,0,0,.52); }
     .dialog-head { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px 18px; border-bottom:1px solid var(--line); }
     .dialog-title { font-size:16px; font-weight:800; }
     .dialog-body { padding:18px; display:grid; gap:16px; overflow:auto; max-height:calc(100vh - 110px); }
     .download-section { display:grid; gap:10px; }
+    .settings-row { display:grid; grid-template-columns:1fr auto; gap:14px; align-items:center; padding:12px 0; border-bottom:1px solid var(--line); }
+    .settings-row:last-child { border-bottom:0; }
+    .settings-row strong { display:block; font-size:14px; margin-bottom:3px; }
+    .settings-row span { color:var(--muted); font-size:12px; }
+    .switch { position:relative; width:44px; height:26px; display:inline-block; }
+    .switch input { opacity:0; width:0; height:0; }
+    .slider { position:absolute; cursor:pointer; inset:0; background:#2a3038; border-radius:999px; transition:.16s; }
+    .slider:before { content:""; position:absolute; width:20px; height:20px; left:3px; top:3px; background:#fff; border-radius:50%; transition:.16s; }
+    .switch input:checked + .slider { background:var(--accent); }
+    .switch input:checked + .slider:before { transform:translateX(18px); }
+    .settings-status { color:var(--muted); min-height:18px; font-size:12px; }
     .section-title { color:var(--muted); font-size:13px; font-weight:700; }
     .download-row { display:grid; grid-template-columns:minmax(220px,1fr) auto; gap:8px; align-items:start; }
     .hf-results { display:grid; gap:6px; max-height:min(280px,32vh); overflow:auto; padding-right:4px; }
@@ -79,6 +93,7 @@
     <h1><img class="brand-logo" src="/assets/icons/favicon-32.png" alt="">Nucleus</h1>
     <div class="toolbar">
       <button id="openDownloadBtn">Download model</button>
+      <button id="openSettingsBtn" class="ghost-btn">Settings</button>
     </div>
   </header>
   <div id="updateBanner" class="update-banner">
@@ -126,6 +141,42 @@
       </div>
     </div>
   </dialog>
+  <dialog id="settingsDialog">
+    <div class="dialog-head">
+      <div class="dialog-title">Settings</div>
+      <button id="closeSettingsBtn" class="ghost-btn" type="button">Close</button>
+    </div>
+    <div class="dialog-body">
+      <div class="settings-row">
+        <div>
+          <strong>Open Nucleus at login</strong>
+          <span>Start the macOS app automatically when you sign in.</span>
+        </div>
+        <label class="switch">
+          <input id="launchAtLogin" type="checkbox">
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="settings-row">
+        <div>
+          <strong>Check for updates automatically</strong>
+          <span>Show the update banner when a newer GitHub release is available.</span>
+        </div>
+        <label class="switch">
+          <input id="autoCheckUpdate" type="checkbox">
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="settings-row">
+        <div>
+          <strong>Update check</strong>
+          <span id="manualUpdateStatus">Check the latest GitHub release now.</span>
+        </div>
+        <button id="checkUpdateBtn" type="button">Check now</button>
+      </div>
+      <div id="settingsStatus" class="settings-status"></div>
+    </div>
+  </dialog>
   <main>
     <section class="grid">
       <div class="panel"><div class="metric">Ollama</div><div id="ollama" class="value warn">checking</div></div>
@@ -155,6 +206,8 @@
     let pullState = null;
     let hfSearchTimer = null;
     let updatePoll = null;
+    let appSettings = {launchAtLogin:false, autoCheckUpdate:true};
+    let cachedModels = [];
 
     async function refresh() {
       const [status, models] = await Promise.all([
@@ -166,15 +219,33 @@
       $('activeRequests').textContent = status.active.length;
       $('activeUsers').textContent = new Set(status.active.map(r => r.user)).size;
       $('recentModel').textContent = status.recent[0]?.model || 'none';
-      $('models').innerHTML = models.models.map(m => `
-        <tr>
-          <td>${escapeHTML(m.name)}</td>
-          <td>${fmtBytes(m.size)}</td>
-          <td class="actions"><button class="danger-btn" type="button" data-delete-model="${escapeHTML(m.name)}">Delete</button></td>
-        </tr>
-      `).join('');
+      cachedModels = models.models || [];
+      renderModels();
       $('active').innerHTML = status.active.map(r => `<tr><td>${r.user}</td><td>${r.model}</td><td>${r.client}</td><td>${fmtTime(r.startedAt)}</td></tr>`).join('');
       $('recent').innerHTML = status.recent.map(r => `<tr><td>${r.user}</td><td>${r.model}</td><td>${r.status}</td><td>${fmtDuration(r.duration)}</td><td>${r.client}</td></tr>`).join('');
+    }
+
+    function renderModels() {
+      const rows = cachedModels.map(m => {
+        const downloading = pullState && pullState.name === m.name;
+        return `
+          <tr>
+            <td class="model-name" data-copy-model="${escapeHTML(m.name)}" title="Click to copy">${escapeHTML(m.name)} ${downloading ? `<span class="download-badge">Downloading ${pullState.percent || 0}%</span>` : ''}</td>
+            <td>${downloading ? (pullState.status || 'Downloading') : fmtBytes(m.size)}</td>
+            <td class="actions">${downloading ? '<button class="ghost-btn" type="button" disabled>Installing</button>' : `<button class="danger-btn" type="button" data-delete-model="${escapeHTML(m.name)}">Delete</button>`}</td>
+          </tr>
+        `;
+      });
+      if (pullState && !cachedModels.some(m => m.name === pullState.name)) {
+        rows.unshift(`
+          <tr>
+            <td class="model-name" data-copy-model="${escapeHTML(pullState.name)}" title="Click to copy">${escapeHTML(pullState.name)} <span class="download-badge">Downloading ${pullState.percent || 0}%</span></td>
+            <td>${pullState.status || 'Downloading'}</td>
+            <td class="actions"><button class="ghost-btn" type="button" disabled>Installing</button></td>
+          </tr>
+        `);
+      }
+      $('models').innerHTML = rows.join('');
     }
 
     function setPullProgress(name, update) {
@@ -183,6 +254,7 @@
       const percent = total > 0 ? Math.max(0, Math.min(100, Math.round((completed / total) * 100))) : 0;
       const status = update.status || 'Installing';
       pullState = {name, percent, status};
+      renderModels();
       $('pullProgress').classList.add('open');
       $('pullTitle').textContent = `Installing ${name}`;
       $('pullPercent').textContent = total > 0 ? `${percent}%` : status;
@@ -192,6 +264,7 @@
 
     function finishPullProgress(name, ok, detail) {
       pullState = null;
+      renderModels();
       $('pullTitle').textContent = ok ? `Installed ${name}` : `Install failed: ${name}`;
       $('pullPercent').textContent = ok ? 'Done' : 'Error';
       $('pullFill').style.width = ok ? '100%' : '0%';
@@ -299,8 +372,16 @@
       setTimeout(() => $('modelName').focus(), 0);
     };
     $('closeDownloadBtn').onclick = () => $('downloadDialog').close();
+    $('openSettingsBtn').onclick = () => {
+      $('settingsDialog').showModal();
+      loadSettings();
+    };
+    $('closeSettingsBtn').onclick = () => $('settingsDialog').close();
     $('dismissUpdateBtn').onclick = () => $('updateBanner').classList.remove('open');
     $('updateBtn').onclick = startUpdate;
+    $('checkUpdateBtn').onclick = () => checkForUpdates(true);
+    $('launchAtLogin').addEventListener('change', saveSettings);
+    $('autoCheckUpdate').addEventListener('change', saveSettings);
 
     $('pullBtn').onclick = () => {
       pullModel($('modelName').value.trim());
@@ -323,6 +404,13 @@
     });
 
     $('models').addEventListener('click', async (event) => {
+      const copyTarget = event.target.closest('[data-copy-model]');
+      if (copyTarget) {
+        await copyText(copyTarget.dataset.copyModel);
+        copyTarget.title = 'Copied';
+        setTimeout(() => copyTarget.title = 'Click to copy', 1200);
+        return;
+      }
       const button = event.target.closest('[data-delete-model]');
       if (!button) return;
       const name = button.dataset.deleteModel;
@@ -339,6 +427,19 @@
         button.disabled = false;
       }
     });
+
+    async function copyText(value) {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+        return;
+      }
+      const input = document.createElement('input');
+      input.value = value;
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand('copy');
+      input.remove();
+    }
 
     $('modelName').addEventListener('input', refreshSuggestions);
     $('modelName').addEventListener('focus', refreshSuggestions);
@@ -367,13 +468,57 @@
     ['request_started', 'request_finished', 'model_deleted', 'error'].forEach((name) => source.addEventListener(name, refresh));
     setInterval(refresh, 3000);
     refresh();
-    checkForUpdates();
+    loadSettings().then(() => {
+      if (appSettings.autoCheckUpdate) checkForUpdates(false);
+    });
 
-    async function checkForUpdates() {
+    async function loadSettings() {
+      const data = await fetch('/api/settings').then(r => r.json()).catch(() => null);
+      if (!data) return;
+      appSettings = data;
+      $('launchAtLogin').checked = !!data.launchAtLogin;
+      $('autoCheckUpdate').checked = !!data.autoCheckUpdate;
+    }
+
+    async function saveSettings() {
+      const next = {
+        launchAtLogin: $('launchAtLogin').checked,
+        autoCheckUpdate: $('autoCheckUpdate').checked
+      };
+      $('settingsStatus').textContent = 'Saving...';
+      const response = await fetch('/api/settings', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(next)
+      });
+      if (!response.ok) {
+        $('settingsStatus').textContent = await response.text();
+        $('launchAtLogin').checked = !!appSettings.launchAtLogin;
+        $('autoCheckUpdate').checked = !!appSettings.autoCheckUpdate;
+        return;
+      }
+      appSettings = await response.json();
+      $('launchAtLogin').checked = !!appSettings.launchAtLogin;
+      $('autoCheckUpdate').checked = !!appSettings.autoCheckUpdate;
+      $('settingsStatus').textContent = 'Saved.';
+    }
+
+    async function checkForUpdates(manual) {
+      if (manual) {
+        $('manualUpdateStatus').textContent = 'Checking GitHub releases...';
+      }
       const info = await fetch('/api/update/check').then(r => r.json()).catch(() => null);
-      if (!info || !info.available) return;
+      if (!info) {
+        if (manual) $('manualUpdateStatus').textContent = 'Update check failed.';
+        return;
+      }
+      if (!info.available) {
+        if (manual) $('manualUpdateStatus').textContent = info.current === 'dev' ? 'Update checks are disabled for dev builds.' : `You are up to date. Current version: ${info.current}.`;
+        return;
+      }
       $('updateText').textContent = `${info.latest} is ready to install. Current version: ${info.current}.`;
       $('updateBanner').classList.add('open');
+      if (manual) $('manualUpdateStatus').textContent = `${info.latest} is available.`;
     }
 
     async function startUpdate() {

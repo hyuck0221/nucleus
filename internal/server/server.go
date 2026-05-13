@@ -16,6 +16,7 @@ import (
 
 	"github.com/shimhyuck/nucleus/internal/huggingface"
 	"github.com/shimhyuck/nucleus/internal/ollama"
+	"github.com/shimhyuck/nucleus/internal/settings"
 	"github.com/shimhyuck/nucleus/internal/store"
 	"github.com/shimhyuck/nucleus/internal/updater"
 	"github.com/shimhyuck/nucleus/internal/version"
@@ -27,13 +28,14 @@ var webFS embed.FS
 type Server struct {
 	ollama *ollama.Client
 	hf     *huggingface.Client
+	config *settings.Manager
 	update *updater.Client
 	store  *store.Store
 	logger *slog.Logger
 }
 
 func New(ollamaClient *ollama.Client, usage *store.Store, logger *slog.Logger) *Server {
-	return &Server{ollama: ollamaClient, hf: huggingface.New(), update: updater.New(), store: usage, logger: logger}
+	return &Server{ollama: ollamaClient, hf: huggingface.New(), config: settings.New(), update: updater.New(), store: usage, logger: logger}
 }
 
 func (s *Server) Handler() http.Handler {
@@ -48,6 +50,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/models/pull", s.pull)
 	mux.HandleFunc("/api/models/delete", s.deleteModel)
 	mux.HandleFunc("/api/huggingface/models", s.huggingFaceModels)
+	mux.HandleFunc("/api/settings", s.settings)
 	mux.HandleFunc("/api/update/check", s.updateCheck)
 	mux.HandleFunc("/api/update/download", s.updateDownload)
 	mux.HandleFunc("/api/update/progress", s.updateProgress)
@@ -168,6 +171,26 @@ func (s *Server) huggingFaceModels(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string]interface{}{"models": models})
+}
+
+func (s *Server) settings(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		writeJSON(w, s.config.Get())
+	case http.MethodPost:
+		var cfg settings.Settings
+		if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if err := s.config.Save(cfg); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		writeJSON(w, s.config.Get())
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
 }
 
 func (s *Server) updateCheck(w http.ResponseWriter, r *http.Request) {

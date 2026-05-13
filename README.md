@@ -134,3 +134,7 @@ This keeps the API simple for tools like opencode while still making dashboard u
 ## Model Downloads
 
 Use the dashboard `Download model` button to pull models from the Ollama library or search Hugging Face GGUF repositories. Hugging Face results are downloaded through Ollama using names like `hf.co/bartowski/Llama-3.2-1B-Instruct-GGUF`.
+
+## Settings
+
+Use `Settings` in the top bar to enable opening Nucleus at login, toggle automatic update checks, or manually check the latest GitHub release. Login startup is managed with `~/Library/LaunchAgents/ai.nucleus.local.plist`.

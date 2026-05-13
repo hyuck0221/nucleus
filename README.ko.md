@@ -167,6 +167,10 @@ curl 'http://127.0.0.1:8787/api/model-suggestions?q=code'
 curl 'http://127.0.0.1:8787/api/huggingface/models?q=llama%203.2'
 ```
 
+## 설정
+
+상단 `Settings`에서 컴퓨터 로그인 시 Nucleus 자동 실행, 업데이트 자동 확인, 수동 업데이트 확인을 설정할 수 있습니다. 자동 실행은 `~/Library/LaunchAgents/ai.nucleus.local.plist`로 관리됩니다.
+
 ## 릴리즈
 
 GitHub에 `v*.*.*` 형식의 태그를 push하면 GitHub Actions가 macOS용 바이너리를 빌드하고 Release를 생성합니다.
