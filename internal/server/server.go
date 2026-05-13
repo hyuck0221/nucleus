@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -449,20 +450,47 @@ func firstPrivateIPv4() string {
 func tailscaleDNSName(ctx context.Context) (string, bool) {
 	ctx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
-	output, err := exec.CommandContext(ctx, "tailscale", "status", "--json").Output()
+	output, err := tailscaleStatusJSON(ctx)
 	if err != nil {
 		return "", false
 	}
 	var status struct {
 		Self struct {
-			DNSName string `json:"DNSName"`
+			DNSName      string   `json:"DNSName"`
+			TailscaleIPs []string `json:"TailscaleIPs"`
 		} `json:"Self"`
 	}
 	if err := json.Unmarshal(output, &status); err != nil {
 		return "", false
 	}
 	host := strings.TrimSuffix(strings.TrimSpace(status.Self.DNSName), ".")
-	return host, host != ""
+	if host != "" {
+		return host, true
+	}
+	for _, ip := range status.Self.TailscaleIPs {
+		if parsed := net.ParseIP(strings.TrimSpace(ip)); parsed != nil && parsed.To4() != nil {
+			return parsed.String(), true
+		}
+	}
+	return "", false
+}
+
+func tailscaleStatusJSON(ctx context.Context) ([]byte, error) {
+	candidates := [][]string{
+		{"tailscale", "status", "--json"},
+		{"/Applications/Tailscale.app/Contents/MacOS/Tailscale", "status", "--json"},
+	}
+	var lastErr error
+	for _, args := range candidates {
+		cmd := exec.CommandContext(ctx, args[0], args[1:]...)
+		cmd.Env = append(os.Environ(), "TAILSCALE_BE_CLI=1")
+		output, err := cmd.Output()
+		if err == nil {
+			return output, nil
+		}
+		lastErr = err
+	}
+	return nil, lastErr
 }
 
 func modelFromBody(body []byte) string {
