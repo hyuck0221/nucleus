@@ -79,6 +79,7 @@ Tagged releases attach both CLI tarballs and installable DMG files:
 - `Nucleus-<version>-darwin-amd64.dmg`
 
 Open the DMG, drag `Nucleus.app` to `Applications`, then launch it. The app starts the local server with the default `0.0.0.0:8787` listener.
+Launching the app opens the dashboard in your browser. App logs are written to `~/Library/Logs/Nucleus/nucleus.log`.
 
 GitHub release DMGs are ad-hoc signed and not notarized. On first launch, macOS may block the app because it is distributed outside Apple notarization. If you trust the GitHub release, remove the quarantine attribute after dragging the app to Applications:
 

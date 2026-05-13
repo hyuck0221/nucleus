@@ -102,6 +102,7 @@ curl http://hshim.taila7bd14.ts.net:8787/v1/chat/completions \
 - `Nucleus-<version>-darwin-amd64.dmg`
 
 DMG를 열고 `Nucleus.app`을 `Applications`로 드래그한 뒤 실행하면 됩니다. 앱은 기본값인 `0.0.0.0:8787`로 로컬 서버를 시작합니다.
+앱을 실행하면 브라우저에서 대시보드를 엽니다. 앱 로그는 `~/Library/Logs/Nucleus/nucleus.log`에 기록됩니다.
 
 GitHub release DMG는 ad-hoc signing만 적용하며 Apple notarization은 사용하지 않습니다. 처음 실행할 때 macOS가 앱을 막을 수 있습니다. GitHub 릴리즈를 신뢰한다면 앱을 Applications로 옮긴 뒤 quarantine 속성을 제거하고 실행합니다.
 

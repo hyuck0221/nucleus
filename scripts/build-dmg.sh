@@ -49,7 +49,34 @@ PLIST
 cat > "$APP_DIR/Contents/MacOS/Nucleus" <<'SH'
 #!/bin/sh
 APP_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-exec "$APP_DIR/Resources/nucleus" serve
+BIN="$APP_DIR/Resources/nucleus"
+LOG_DIR="$HOME/Library/Logs/Nucleus"
+LOG_FILE="$LOG_DIR/nucleus.log"
+DASHBOARD_URL="http://127.0.0.1:8787"
+
+mkdir -p "$LOG_DIR"
+
+if /usr/bin/curl -fsS "$DASHBOARD_URL/api/status" >/dev/null 2>&1; then
+  /usr/bin/open "$DASHBOARD_URL"
+  exit 0
+fi
+
+"$BIN" serve >> "$LOG_FILE" 2>&1 &
+SERVER_PID="$!"
+
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+  if /usr/bin/curl -fsS "$DASHBOARD_URL/api/status" >/dev/null 2>&1; then
+    /usr/bin/open "$DASHBOARD_URL"
+    exit 0
+  fi
+  if ! /bin/kill -0 "$SERVER_PID" >/dev/null 2>&1; then
+    /usr/bin/open -a Console "$LOG_FILE" >/dev/null 2>&1
+    exit 1
+  fi
+  /bin/sleep 0.5
+done
+
+/usr/bin/open "$DASHBOARD_URL"
 SH
 chmod +x "$APP_DIR/Contents/MacOS/Nucleus"
 
