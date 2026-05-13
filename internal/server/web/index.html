@@ -26,8 +26,14 @@
     input { background:#0f1114; color:var(--text); border:1px solid var(--line); border-radius:7px; padding:9px 10px; width:100%; min-width:0; user-select:text; -webkit-user-select:text; }
     button { background:var(--accent); color:#071019; border:0; border-radius:7px; padding:9px 12px; font-weight:700; cursor:pointer; }
     button:disabled { cursor:not-allowed; opacity:.62; }
+    .icon-btn { display:inline-flex; align-items:center; gap:7px; min-height:36px; }
+    .icon-btn svg { width:16px; height:16px; flex:0 0 auto; stroke:currentColor; }
+    .icon-only { width:36px; padding:9px; justify-content:center; }
+    .icon-only svg { width:17px; height:17px; }
     .ghost-btn { background:#222933; color:var(--text); border:1px solid var(--line); padding:6px 9px; font-size:12px; }
     .danger-btn { background:#342028; color:#ffd8de; border:1px solid #5d2f3b; padding:6px 9px; font-size:12px; }
+    .toast { position:fixed; top:78px; left:50%; transform:translate(-50%,-8px); opacity:0; pointer-events:none; z-index:40; padding:10px 14px; border:1px solid #2d684d; background:#12281f; color:#d9ffee; border-radius:8px; box-shadow:0 14px 38px rgba(0,0,0,.35); font-size:13px; font-weight:700; transition:opacity .16s ease, transform .16s ease; }
+    .toast.open { opacity:1; transform:translate(-50%,0); }
     .update-banner { display:none; align-items:center; justify-content:space-between; gap:12px; padding:11px 22px; background:#102235; border-bottom:1px solid #214c74; color:var(--text); position:sticky; top:65px; z-index:2; }
     .update-banner.open { display:flex; }
     .update-copy { min-width:0; font-size:13px; }
@@ -79,23 +85,36 @@
     .progress-track { width:100%; height:10px; background:#0d1014; border:1px solid var(--line); border-radius:999px; overflow:hidden; }
     .progress-fill { height:100%; width:0; background:linear-gradient(90deg,var(--accent),var(--ok)); transition:width .18s ease; }
     .progress-detail { color:var(--muted); font-size:12px; min-height:16px; }
+    .panel-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:8px; }
+    .panel-head .metric { margin-bottom:0; }
+    .tabs { display:flex; gap:6px; flex-wrap:wrap; }
+    .tab-btn { background:#11161c; color:var(--muted); border:1px solid var(--line); padding:5px 9px; font-size:12px; }
+    .tab-btn.active { color:#071019; background:var(--accent); border-color:var(--accent); }
+    .pager { display:flex; align-items:center; justify-content:flex-end; gap:8px; padding-top:10px; color:var(--muted); font-size:12px; min-height:38px; }
+    .pager button { background:#222933; color:var(--text); border:1px solid var(--line); padding:5px 9px; font-size:12px; }
     table { width:100%; border-collapse:collapse; table-layout:fixed; }
     th, td { text-align:left; border-bottom:1px solid var(--line); padding:10px 8px; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     td.actions { text-align:right; }
     th { color:var(--muted); font-weight:600; }
     .span2 { grid-column:span 2; }
     .span4 { grid-column:span 4; }
-    @media (max-width:900px) { .grid { grid-template-columns:1fr; } .span2,.span4 { grid-column:auto; } header { align-items:flex-start; gap:10px; flex-direction:column; } .update-banner { top:108px; align-items:flex-start; flex-direction:column; } .update-actions, .update-progress { width:100%; } .toolbar, .download-row, .model-search { width:100%; grid-template-columns:1fr; } #pullBtn, #hfSearchBtn { width:100%; } .hf-results { max-height:240px; } .hf-card { grid-template-columns:minmax(0,1fr) auto; } }
+    @media (max-width:900px) { .grid { grid-template-columns:1fr; } .span2,.span4 { grid-column:auto; } header { align-items:flex-start; gap:10px; flex-direction:column; } .update-banner { top:108px; align-items:flex-start; flex-direction:column; } .update-actions, .update-progress { width:100%; } .toolbar, .download-row, .model-search { width:100%; grid-template-columns:1fr; } .panel-head { align-items:flex-start; flex-direction:column; } #openDownloadBtn, #pullBtn, #hfSearchBtn { width:100%; } .hf-results { max-height:240px; } .hf-card { grid-template-columns:minmax(0,1fr) auto; } }
   </style>
 </head>
 <body>
   <header>
     <h1><img class="brand-logo" src="/assets/icons/favicon-32.png" alt="">Nucleus</h1>
     <div class="toolbar">
-      <button id="openDownloadBtn">Download model</button>
-      <button id="openSettingsBtn" class="ghost-btn">Settings</button>
+      <button id="openDownloadBtn" class="icon-btn" type="button" title="Download model">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+        Download model
+      </button>
+      <button id="openSettingsBtn" class="ghost-btn icon-btn icon-only" type="button" title="Settings" aria-label="Settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.7 3.4 9 5.8a7.8 7.8 0 0 0-1.2.7L5.4 5.9 3.9 8.5l1.7 1.8a7 7 0 0 0 0 1.4l-1.7 1.8 1.5 2.6 2.4-.6c.4.3.8.5 1.2.7l.7 2.4h3l.7-2.4c.4-.2.8-.4 1.2-.7l2.4.6 1.5-2.6-1.7-1.8a7 7 0 0 0 0-1.4l1.7-1.8-1.5-2.6-2.4.6c-.4-.3-.8-.5-1.2-.7l-.7-2.4h-3Z"/><circle cx="11.2" cy="12" r="2.5"/></svg>
+      </button>
     </div>
   </header>
+  <div id="toast" class="toast"></div>
   <div id="updateBanner" class="update-banner">
     <div class="update-copy">
       <strong id="updateTitle">Update available</strong>
@@ -184,16 +203,36 @@
       <div class="panel"><div class="metric">Active requests</div><div id="activeRequests" class="value">0</div></div>
       <div class="panel"><div class="metric">Recent model</div><div id="recentModel" class="value">none</div></div>
       <div class="panel span2">
-        <div class="metric">Installed models</div>
+        <div class="panel-head">
+          <div class="metric">Installed models</div>
+          <div id="modelPagerTop" class="metric"></div>
+        </div>
         <table><thead><tr><th>Model</th><th>Size</th><th></th></tr></thead><tbody id="models"></tbody></table>
+        <div class="pager">
+          <button id="modelPrev" type="button">Prev</button>
+          <span id="modelPageInfo"></span>
+          <button id="modelNext" type="button">Next</button>
+        </div>
       </div>
       <div class="panel span2">
         <div class="metric">Active now</div>
         <table><thead><tr><th>User</th><th>Model</th><th>Client</th><th>Started</th></tr></thead><tbody id="active"></tbody></table>
       </div>
       <div class="panel span4">
-        <div class="metric">Recent API usage</div>
+        <div class="panel-head">
+          <div class="metric">API usage</div>
+          <div class="tabs">
+            <button class="tab-btn active" type="button" data-usage-tab="all">All</button>
+            <button class="tab-btn" type="button" data-usage-tab="success">Success</button>
+            <button class="tab-btn" type="button" data-usage-tab="error">Error</button>
+          </div>
+        </div>
         <table><thead><tr><th>User</th><th>Model</th><th>Status</th><th>Duration</th><th>Client</th></tr></thead><tbody id="recent"></tbody></table>
+        <div class="pager">
+          <button id="usagePrev" type="button">Prev</button>
+          <span id="usagePageInfo"></span>
+          <button id="usageNext" type="button">Next</button>
+        </div>
       </div>
     </section>
   </main>
@@ -208,6 +247,12 @@
     let updatePoll = null;
     let appSettings = {launchAtLogin:false, autoCheckUpdate:true};
     let cachedModels = [];
+    let recentRecords = [];
+    let modelPage = 1;
+    let usagePage = 1;
+    let usageTab = 'all';
+    const modelPageSize = 5;
+    const usagePageSize = 50;
 
     async function refresh() {
       const [status, models] = await Promise.all([
@@ -220,13 +265,21 @@
       $('activeUsers').textContent = new Set(status.active.map(r => r.user)).size;
       $('recentModel').textContent = status.recent[0]?.model || 'none';
       cachedModels = models.models || [];
+      recentRecords = status.recent || [];
       renderModels();
+      renderUsage();
       $('active').innerHTML = status.active.map(r => `<tr><td>${r.user}</td><td>${r.model}</td><td>${r.client}</td><td>${fmtTime(r.startedAt)}</td></tr>`).join('');
-      $('recent').innerHTML = status.recent.map(r => `<tr><td>${r.user}</td><td>${r.model}</td><td>${r.status}</td><td>${fmtDuration(r.duration)}</td><td>${r.client}</td></tr>`).join('');
     }
 
     function renderModels() {
-      const rows = cachedModels.map(m => {
+      const visibleModels = [...cachedModels];
+      if (pullState && !visibleModels.some(m => m.name === pullState.name)) {
+        visibleModels.unshift({name: pullState.name, size: 0, downloading: true});
+      }
+      const totalPages = Math.max(1, Math.ceil(visibleModels.length / modelPageSize));
+      modelPage = Math.min(Math.max(1, modelPage), totalPages);
+      const start = (modelPage - 1) * modelPageSize;
+      const rows = visibleModels.slice(start, start + modelPageSize).map(m => {
         const downloading = pullState && pullState.name === m.name;
         return `
           <tr>
@@ -236,16 +289,29 @@
           </tr>
         `;
       });
-      if (pullState && !cachedModels.some(m => m.name === pullState.name)) {
-        rows.unshift(`
-          <tr>
-            <td class="model-name" data-copy-model="${escapeHTML(pullState.name)}" title="Click to copy">${escapeHTML(pullState.name)} <span class="download-badge">Downloading ${pullState.percent || 0}%</span></td>
-            <td>${pullState.status || 'Downloading'}</td>
-            <td class="actions"><button class="ghost-btn" type="button" disabled>Installing</button></td>
-          </tr>
-        `);
-      }
-      $('models').innerHTML = rows.join('');
+      $('models').innerHTML = rows.join('') || '<tr><td colspan="3">No models installed</td></tr>';
+      $('modelPageInfo').textContent = `${modelPage} / ${totalPages}`;
+      $('modelPagerTop').textContent = `${visibleModels.length} total`;
+      $('modelPrev').disabled = modelPage <= 1;
+      $('modelNext').disabled = modelPage >= totalPages;
+    }
+
+    function filteredUsage() {
+      if (usageTab === 'success') return recentRecords.filter(r => r.status >= 200 && r.status < 400);
+      if (usageTab === 'error') return recentRecords.filter(r => r.status >= 400 || r.error);
+      return recentRecords;
+    }
+
+    function renderUsage() {
+      const records = filteredUsage();
+      const totalPages = Math.max(1, Math.ceil(records.length / usagePageSize));
+      usagePage = Math.min(Math.max(1, usagePage), totalPages);
+      const start = (usagePage - 1) * usagePageSize;
+      const rows = records.slice(start, start + usagePageSize).map(r => `<tr><td>${escapeHTML(r.user)}</td><td>${escapeHTML(r.model)}</td><td>${r.status}</td><td>${fmtDuration(r.duration)}</td><td>${escapeHTML(r.client)}</td></tr>`);
+      $('recent').innerHTML = rows.join('') || '<tr><td colspan="5">No usage records</td></tr>';
+      $('usagePageInfo').textContent = `${usagePage} / ${totalPages} · ${records.length} records`;
+      $('usagePrev').disabled = usagePage <= 1;
+      $('usageNext').disabled = usagePage >= totalPages;
     }
 
     function setPullProgress(name, update) {
@@ -407,6 +473,7 @@
       const copyTarget = event.target.closest('[data-copy-model]');
       if (copyTarget) {
         await copyText(copyTarget.dataset.copyModel);
+        showToast(`Copied ${copyTarget.dataset.copyModel}`);
         copyTarget.title = 'Copied';
         setTimeout(() => copyTarget.title = 'Click to copy', 1200);
         return;
@@ -440,6 +507,38 @@
       document.execCommand('copy');
       input.remove();
     }
+
+    function showToast(message) {
+      $('toast').textContent = message;
+      $('toast').classList.add('open');
+      clearTimeout(showToast.timer);
+      showToast.timer = setTimeout(() => $('toast').classList.remove('open'), 1600);
+    }
+
+    $('modelPrev').onclick = () => {
+      modelPage -= 1;
+      renderModels();
+    };
+    $('modelNext').onclick = () => {
+      modelPage += 1;
+      renderModels();
+    };
+    $('usagePrev').onclick = () => {
+      usagePage -= 1;
+      renderUsage();
+    };
+    $('usageNext').onclick = () => {
+      usagePage += 1;
+      renderUsage();
+    };
+    document.querySelectorAll('[data-usage-tab]').forEach((button) => {
+      button.onclick = () => {
+        usageTab = button.dataset.usageTab;
+        usagePage = 1;
+        document.querySelectorAll('[data-usage-tab]').forEach((b) => b.classList.toggle('active', b === button));
+        renderUsage();
+      };
+    });
 
     $('modelName').addEventListener('input', refreshSuggestions);
     $('modelName').addEventListener('focus', refreshSuggestions);
