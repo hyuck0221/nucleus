@@ -71,6 +71,17 @@ For local-only access, run:
 nucleus serve --addr 127.0.0.1:8787
 ```
 
+## macOS DMG
+
+Tagged releases attach both CLI tarballs and installable DMG files:
+
+- `Nucleus-<version>-darwin-arm64.dmg`
+- `Nucleus-<version>-darwin-amd64.dmg`
+
+Open the DMG, drag `Nucleus.app` to `Applications`, then launch it. The app starts the local server with the default `0.0.0.0:8787` listener.
+
+Release DMGs are ad-hoc signed. Full Apple notarization requires a Developer ID certificate and notarization credentials.
+
 ## macOS LaunchAgent
 
 Build and install the binary somewhere stable:

@@ -94,6 +94,17 @@ curl http://hshim.taila7bd14.ts.net:8787/v1/chat/completions \
 
 연결이 계속 안 되면 macOS 방화벽에서 Nucleus 바이너리의 수신 연결 허용 여부와 Tailscale 연결 상태를 확인합니다.
 
+## macOS DMG 설치
+
+태그 릴리즈를 만들면 CLI tarball과 함께 설치용 DMG 파일이 release assets에 첨부됩니다.
+
+- `Nucleus-<version>-darwin-arm64.dmg`
+- `Nucleus-<version>-darwin-amd64.dmg`
+
+DMG를 열고 `Nucleus.app`을 `Applications`로 드래그한 뒤 실행하면 됩니다. 앱은 기본값인 `0.0.0.0:8787`로 로컬 서버를 시작합니다.
+
+릴리즈 DMG는 ad-hoc signing만 적용됩니다. Apple 정식 notarization은 Developer ID 인증서와 notarization 자격 증명이 필요합니다.
+
 ## macOS LaunchAgent
 
 먼저 바이너리를 빌드한 뒤 안정적인 위치에 설치합니다.

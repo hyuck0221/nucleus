@@ -27,6 +27,7 @@ jobs:
           VERSION: ${{ github.ref_name }}
           COMMIT: ${{ github.sha }}
         run: |
+          chmod +x scripts/build-dmg.sh
           mkdir -p dist
           DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           for arch in arm64 amd64; do
@@ -34,8 +35,9 @@ jobs:
               -ldflags "-s -w -X github.com/shimhyuck/nucleus/internal/version.Version=$VERSION -X github.com/shimhyuck/nucleus/internal/version.Commit=$COMMIT -X github.com/shimhyuck/nucleus/internal/version.Date=$DATE" \
               -o "dist/nucleus-darwin-$arch" ./cmd/nucleus
             tar -C dist -czf "dist/nucleus-darwin-$arch.tar.gz" "nucleus-darwin-$arch"
+            scripts/build-dmg.sh "$arch" "$VERSION" "dist/nucleus-darwin-$arch" dist
           done
-          shasum -a 256 dist/*.tar.gz > dist/checksums.txt
+          shasum -a 256 dist/*.tar.gz dist/*.dmg > dist/checksums.txt
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
@@ -43,4 +45,5 @@ jobs:
           generate_release_notes: true
           files: |
             dist/*.tar.gz
+            dist/*.dmg
             dist/checksums.txt
