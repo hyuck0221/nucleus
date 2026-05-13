@@ -17,6 +17,7 @@ import (
 	"github.com/shimhyuck/nucleus/internal/huggingface"
 	"github.com/shimhyuck/nucleus/internal/ollama"
 	"github.com/shimhyuck/nucleus/internal/store"
+	"github.com/shimhyuck/nucleus/internal/updater"
 	"github.com/shimhyuck/nucleus/internal/version"
 )
 
@@ -26,12 +27,13 @@ var webFS embed.FS
 type Server struct {
 	ollama *ollama.Client
 	hf     *huggingface.Client
+	update *updater.Client
 	store  *store.Store
 	logger *slog.Logger
 }
 
 func New(ollamaClient *ollama.Client, usage *store.Store, logger *slog.Logger) *Server {
-	return &Server{ollama: ollamaClient, hf: huggingface.New(), store: usage, logger: logger}
+	return &Server{ollama: ollamaClient, hf: huggingface.New(), update: updater.New(), store: usage, logger: logger}
 }
 
 func (s *Server) Handler() http.Handler {
@@ -46,6 +48,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/models/pull", s.pull)
 	mux.HandleFunc("/api/models/delete", s.deleteModel)
 	mux.HandleFunc("/api/huggingface/models", s.huggingFaceModels)
+	mux.HandleFunc("/api/update/check", s.updateCheck)
+	mux.HandleFunc("/api/update/download", s.updateDownload)
+	mux.HandleFunc("/api/update/progress", s.updateProgress)
 	mux.HandleFunc("/api/usage", s.usage)
 	mux.HandleFunc("/api/events", s.events)
 	mux.HandleFunc("/v1/models", s.openAIModels)
@@ -163,6 +168,26 @@ func (s *Server) huggingFaceModels(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string]interface{}{"models": models})
+}
+
+func (s *Server) updateCheck(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+	writeJSON(w, s.update.Check(ctx, version.Version))
+}
+
+func (s *Server) updateDownload(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+	defer cancel()
+	writeJSON(w, s.update.StartDownload(ctx, version.Version))
+}
+
+func (s *Server) updateProgress(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, s.update.State())
 }
 
 func (s *Server) usage(w http.ResponseWriter, r *http.Request) {

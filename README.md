@@ -80,7 +80,16 @@ Tagged releases attach both CLI tarballs and installable DMG files:
 
 Open the DMG, drag `Nucleus.app` to `Applications`, then launch it. The app starts the local server with the default `0.0.0.0:8787` listener.
 
-Release DMGs are ad-hoc signed. Full Apple notarization requires a Developer ID certificate and notarization credentials.
+Release DMGs are signed and notarized in GitHub Actions. Configure these repository secrets before pushing a release tag:
+
+- `APPLE_DEVELOPER_ID_CERTIFICATE_BASE64`: base64-encoded Developer ID Application `.p12`
+- `APPLE_DEVELOPER_ID_CERTIFICATE_PASSWORD`: `.p12` password
+- `APPLE_NOTARY_KEY`: App Store Connect API key `.p8` contents
+- `APPLE_NOTARY_KEY_ID`: App Store Connect key ID
+- `APPLE_NOTARY_ISSUER_ID`: App Store Connect issuer ID
+- `APPLE_BUILD_KEYCHAIN_PASSWORD`: temporary CI keychain password
+
+Without these secrets, the release workflow fails instead of publishing a DMG that macOS Gatekeeper would block.
 
 ## macOS LaunchAgent
 

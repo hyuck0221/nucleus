@@ -22,6 +22,48 @@ jobs:
       - name: Test
         run: go test ./...
 
+      - name: Configure Apple signing and notarization
+        env:
+          APPLE_DEVELOPER_ID_CERTIFICATE_BASE64: ${{ secrets.APPLE_DEVELOPER_ID_CERTIFICATE_BASE64 }}
+          APPLE_DEVELOPER_ID_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_CERTIFICATE_PASSWORD }}
+          APPLE_NOTARY_KEY: ${{ secrets.APPLE_NOTARY_KEY }}
+          APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+          KEYCHAIN_PASSWORD: ${{ secrets.APPLE_BUILD_KEYCHAIN_PASSWORD }}
+        run: |
+          if [ -z "$APPLE_DEVELOPER_ID_CERTIFICATE_BASE64" ] || [ -z "$APPLE_DEVELOPER_ID_CERTIFICATE_PASSWORD" ] || [ -z "$APPLE_NOTARY_KEY" ] || [ -z "$APPLE_NOTARY_KEY_ID" ] || [ -z "$APPLE_NOTARY_ISSUER_ID" ]; then
+            echo "::error::Apple Developer ID signing/notarization secrets are required for release DMGs."
+            exit 1
+          fi
+          KEYCHAIN_PASSWORD="${KEYCHAIN_PASSWORD:-nucleus-ci-keychain}"
+          KEYCHAIN_PATH="$RUNNER_TEMP/nucleus-signing.keychain-db"
+          CERT_PATH="$RUNNER_TEMP/developer-id.p12"
+          NOTARY_KEY_PATH="$RUNNER_TEMP/AuthKey_$APPLE_NOTARY_KEY_ID.p8"
+
+          echo "$APPLE_DEVELOPER_ID_CERTIFICATE_BASE64" | base64 --decode > "$CERT_PATH"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -P "$APPLE_DEVELOPER_ID_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | sed s/\"//g)
+
+          IDENTITY="$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | sed -n 's/.*"\(Developer ID Application:.*\)"/\1/p' | head -1)"
+          if [ -z "$IDENTITY" ]; then
+            echo "::error::No Developer ID Application identity found in certificate."
+            exit 1
+          fi
+          {
+            echo "CODE_SIGN_IDENTITY=$IDENTITY"
+            echo "NOTARY_PROFILE=nucleus-notary"
+          } >> "$GITHUB_ENV"
+
+          printf "%s" "$APPLE_NOTARY_KEY" > "$NOTARY_KEY_PATH"
+          xcrun notarytool store-credentials "nucleus-notary" \
+            --key "$NOTARY_KEY_PATH" \
+            --key-id "$APPLE_NOTARY_KEY_ID" \
+            --issuer "$APPLE_NOTARY_ISSUER_ID"
+
       - name: Build macOS binaries
         env:
           VERSION: ${{ github.ref_name }}

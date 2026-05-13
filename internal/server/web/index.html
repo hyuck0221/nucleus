@@ -28,6 +28,14 @@
     button:disabled { cursor:not-allowed; opacity:.62; }
     .ghost-btn { background:#222933; color:var(--text); border:1px solid var(--line); padding:6px 9px; font-size:12px; }
     .danger-btn { background:#342028; color:#ffd8de; border:1px solid #5d2f3b; padding:6px 9px; font-size:12px; }
+    .update-banner { display:none; align-items:center; justify-content:space-between; gap:12px; padding:11px 22px; background:#102235; border-bottom:1px solid #214c74; color:var(--text); position:sticky; top:65px; z-index:2; }
+    .update-banner.open { display:flex; }
+    .update-copy { min-width:0; font-size:13px; }
+    .update-copy strong { display:block; font-size:14px; margin-bottom:2px; }
+    .update-actions { display:flex; gap:8px; align-items:center; flex-shrink:0; }
+    .update-progress { display:none; width:min(220px,32vw); height:9px; border:1px solid #386891; border-radius:999px; background:#08131d; overflow:hidden; }
+    .update-progress.open { display:block; }
+    .update-fill { height:100%; width:0; background:linear-gradient(90deg,var(--accent),var(--ok)); transition:width .18s ease; }
     .suggestions { position:fixed; top:0; left:0; width:220px; max-height:min(340px,calc(100vh - 88px)); background:#101318; border:1px solid var(--line); border-radius:8px; box-shadow:0 16px 42px rgba(0,0,0,.32); overflow:auto; display:none; z-index:20; }
     .suggestions.open { display:block; }
     .suggestion { width:100%; display:grid; grid-template-columns:1fr auto; gap:6px 12px; align-items:center; background:transparent; color:var(--text); border:0; border-bottom:1px solid var(--line); border-radius:0; padding:10px 12px; text-align:left; cursor:pointer; }
@@ -63,7 +71,7 @@
     th { color:var(--muted); font-weight:600; }
     .span2 { grid-column:span 2; }
     .span4 { grid-column:span 4; }
-    @media (max-width:900px) { .grid { grid-template-columns:1fr; } .span2,.span4 { grid-column:auto; } header { align-items:flex-start; gap:10px; flex-direction:column; } .toolbar, .download-row, .model-search { width:100%; grid-template-columns:1fr; } #pullBtn, #hfSearchBtn { width:100%; } .hf-results { max-height:240px; } .hf-card { grid-template-columns:minmax(0,1fr) auto; } }
+    @media (max-width:900px) { .grid { grid-template-columns:1fr; } .span2,.span4 { grid-column:auto; } header { align-items:flex-start; gap:10px; flex-direction:column; } .update-banner { top:108px; align-items:flex-start; flex-direction:column; } .update-actions, .update-progress { width:100%; } .toolbar, .download-row, .model-search { width:100%; grid-template-columns:1fr; } #pullBtn, #hfSearchBtn { width:100%; } .hf-results { max-height:240px; } .hf-card { grid-template-columns:minmax(0,1fr) auto; } }
   </style>
 </head>
 <body>
@@ -73,6 +81,17 @@
       <button id="openDownloadBtn">Download model</button>
     </div>
   </header>
+  <div id="updateBanner" class="update-banner">
+    <div class="update-copy">
+      <strong id="updateTitle">Update available</strong>
+      <span id="updateText"></span>
+    </div>
+    <div class="update-actions">
+      <div id="updateProgress" class="update-progress"><div id="updateFill" class="update-fill"></div></div>
+      <button id="updateBtn" type="button">Update</button>
+      <button id="dismissUpdateBtn" class="ghost-btn" type="button">Dismiss</button>
+    </div>
+  </div>
   <dialog id="downloadDialog">
     <div class="dialog-head">
       <div class="dialog-title">Download model</div>
@@ -135,6 +154,7 @@
     const escapeHTML = (value) => String(value).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     let pullState = null;
     let hfSearchTimer = null;
+    let updatePoll = null;
 
     async function refresh() {
       const [status, models] = await Promise.all([
@@ -279,6 +299,8 @@
       setTimeout(() => $('modelName').focus(), 0);
     };
     $('closeDownloadBtn').onclick = () => $('downloadDialog').close();
+    $('dismissUpdateBtn').onclick = () => $('updateBanner').classList.remove('open');
+    $('updateBtn').onclick = startUpdate;
 
     $('pullBtn').onclick = () => {
       pullModel($('modelName').value.trim());
@@ -345,6 +367,49 @@
     ['request_started', 'request_finished', 'model_deleted', 'error'].forEach((name) => source.addEventListener(name, refresh));
     setInterval(refresh, 3000);
     refresh();
+    checkForUpdates();
+
+    async function checkForUpdates() {
+      const info = await fetch('/api/update/check').then(r => r.json()).catch(() => null);
+      if (!info || !info.available) return;
+      $('updateText').textContent = `${info.latest} is ready to install. Current version: ${info.current}.`;
+      $('updateBanner').classList.add('open');
+    }
+
+    async function startUpdate() {
+      $('updateBtn').disabled = true;
+      $('dismissUpdateBtn').disabled = true;
+      $('updateProgress').classList.add('open');
+      $('updateText').textContent = 'Preparing update download...';
+      const state = await fetch('/api/update/download', {method:'POST'}).then(r => r.json()).catch((error) => ({error:error.message}));
+      if (state.error) {
+        $('updateText').textContent = state.error;
+        $('updateBtn').disabled = false;
+        $('dismissUpdateBtn').disabled = false;
+        return;
+      }
+      updatePoll = setInterval(refreshUpdateProgress, 700);
+    }
+
+    async function refreshUpdateProgress() {
+      const state = await fetch('/api/update/progress').then(r => r.json()).catch(() => null);
+      if (!state) return;
+      if (state.error) {
+        clearInterval(updatePoll);
+        $('updateText').textContent = state.error;
+        $('updateBtn').disabled = false;
+        $('dismissUpdateBtn').disabled = false;
+        return;
+      }
+      const percent = state.percent || 0;
+      $('updateFill').style.width = `${percent}%`;
+      $('updateText').textContent = state.total > 0 ? `Downloading ${state.assetName}: ${percent}%` : `Downloading ${state.assetName}...`;
+      if (state.done) {
+        clearInterval(updatePoll);
+        $('updateFill').style.width = '100%';
+        $('updateText').textContent = 'Download complete. Opening installer and closing Nucleus...';
+      }
+    }
   </script>
 </body>
 </html>

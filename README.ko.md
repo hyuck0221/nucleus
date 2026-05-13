@@ -103,7 +103,16 @@ curl http://hshim.taila7bd14.ts.net:8787/v1/chat/completions \
 
 DMG를 열고 `Nucleus.app`을 `Applications`로 드래그한 뒤 실행하면 됩니다. 앱은 기본값인 `0.0.0.0:8787`로 로컬 서버를 시작합니다.
 
-릴리즈 DMG는 ad-hoc signing만 적용됩니다. Apple 정식 notarization은 Developer ID 인증서와 notarization 자격 증명이 필요합니다.
+릴리즈 DMG는 GitHub Actions에서 Developer ID 서명과 Apple notarization을 거칩니다. 릴리즈 태그를 push하기 전에 저장소 Secrets에 다음 값을 설정해야 합니다.
+
+- `APPLE_DEVELOPER_ID_CERTIFICATE_BASE64`: Developer ID Application `.p12` 파일을 base64로 인코딩한 값
+- `APPLE_DEVELOPER_ID_CERTIFICATE_PASSWORD`: `.p12` 비밀번호
+- `APPLE_NOTARY_KEY`: App Store Connect API key `.p8` 내용
+- `APPLE_NOTARY_KEY_ID`: App Store Connect key ID
+- `APPLE_NOTARY_ISSUER_ID`: App Store Connect issuer ID
+- `APPLE_BUILD_KEYCHAIN_PASSWORD`: CI에서 사용할 임시 keychain 비밀번호
+
+이 값들이 없으면 Gatekeeper가 막는 DMG를 배포하지 않도록 릴리즈 워크플로가 실패합니다.
 
 ## macOS LaunchAgent
 
