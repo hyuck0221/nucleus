@@ -124,6 +124,22 @@ func (c *Client) Delete(ctx context.Context, model string) error {
 	return nil
 }
 
+func (c *Client) Copy(ctx context.Context, source, destination string) error {
+	payload, _ := json.Marshal(map[string]string{"source": source, "destination": destination})
+	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, c.BaseURL+"/api/copy", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("ollama returned %s: %s", resp.Status, string(body))
+	}
+	return nil
+}
+
 func (c *Client) ProxyOpenAI(ctx context.Context, body io.Reader) (*http.Response, error) {
 	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, c.BaseURL+"/v1/chat/completions", body)
 	req.Header.Set("Content-Type", "application/json")

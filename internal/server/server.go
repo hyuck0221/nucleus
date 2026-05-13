@@ -137,6 +137,19 @@ func (s *Server) pull(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		s.store.Publish("error", err.Error())
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+	if cleanName, ok := cleanHuggingFaceModelName(req.Name); ok {
+		if err := s.ollama.Copy(r.Context(), req.Name, cleanName); err != nil {
+			s.store.Publish("error", err.Error())
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+		if err := s.ollama.Delete(r.Context(), req.Name); err != nil {
+			s.store.Publish("error", err.Error())
+		}
+		s.store.Publish("model_renamed", map[string]string{"source": req.Name, "name": cleanName})
 	}
 }
 
@@ -400,4 +413,22 @@ func suggestModels(query string, installed []ollama.Model, limit int) []modelSug
 		add(model)
 	}
 	return suggestions
+}
+
+func cleanHuggingFaceModelName(name string) (string, bool) {
+	trimmed := strings.TrimSpace(name)
+	lower := strings.ToLower(trimmed)
+	if !strings.HasPrefix(lower, "hf.co/") {
+		return "", false
+	}
+	withoutPrefix := strings.TrimPrefix(trimmed, "hf.co/")
+	parts := strings.Split(withoutPrefix, "/")
+	if len(parts) < 2 {
+		return "", false
+	}
+	model := parts[len(parts)-1]
+	if model == "" {
+		return "", false
+	}
+	return model, model != trimmed
 }

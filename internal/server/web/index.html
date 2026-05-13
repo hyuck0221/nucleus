@@ -70,6 +70,8 @@
     .switch input:checked + .slider { background:var(--accent); }
     .switch input:checked + .slider:before { transform:translateX(18px); }
     .settings-status { color:var(--muted); min-height:18px; font-size:12px; }
+    .settings-update-actions { display:flex; gap:8px; align-items:center; justify-content:flex-end; }
+    .settings-update-actions .update-progress { width:120px; }
     .section-title { color:var(--muted); font-size:13px; font-weight:700; }
     .download-row { display:grid; grid-template-columns:minmax(220px,1fr) auto; gap:8px; align-items:start; }
     .hf-results { display:grid; gap:6px; max-height:min(280px,32vh); overflow:auto; padding-right:4px; }
@@ -191,7 +193,11 @@
           <strong>Update check</strong>
           <span id="manualUpdateStatus">Check the latest GitHub release now.</span>
         </div>
-        <button id="checkUpdateBtn" type="button">Check now</button>
+        <div class="settings-update-actions">
+          <div id="settingsUpdateProgress" class="update-progress"><div id="settingsUpdateFill" class="update-fill"></div></div>
+          <button id="checkUpdateBtn" type="button">Check now</button>
+          <button id="settingsUpdateBtn" type="button" style="display:none">Install</button>
+        </div>
       </div>
       <div id="settingsStatus" class="settings-status"></div>
     </div>
@@ -245,6 +251,7 @@
     let pullState = null;
     let hfSearchTimer = null;
     let updatePoll = null;
+    let availableUpdate = null;
     let appSettings = {launchAtLogin:false, autoCheckUpdate:true};
     let cachedModels = [];
     let recentRecords = [];
@@ -253,6 +260,12 @@
     let usageTab = 'all';
     const modelPageSize = 5;
     const usagePageSize = 50;
+    const displayModelName = (name) => {
+      if (!String(name).toLowerCase().startsWith('hf.co/')) return name;
+      const withoutPrefix = String(name).slice(6);
+      const parts = withoutPrefix.split('/');
+      return parts[parts.length - 1] || name;
+    };
 
     async function refresh() {
       const [status, models] = await Promise.all([
@@ -273,14 +286,15 @@
 
     function renderModels() {
       const visibleModels = [...cachedModels];
-      if (pullState && !visibleModels.some(m => m.name === pullState.name)) {
-        visibleModels.unshift({name: pullState.name, size: 0, downloading: true});
+      const pullDisplayName = pullState ? displayModelName(pullState.name) : '';
+      if (pullState && !visibleModels.some(m => m.name === pullDisplayName || m.name === pullState.name)) {
+        visibleModels.unshift({name: pullDisplayName, size: 0, downloading: true});
       }
       const totalPages = Math.max(1, Math.ceil(visibleModels.length / modelPageSize));
       modelPage = Math.min(Math.max(1, modelPage), totalPages);
       const start = (modelPage - 1) * modelPageSize;
       const rows = visibleModels.slice(start, start + modelPageSize).map(m => {
-        const downloading = pullState && pullState.name === m.name;
+        const downloading = pullState && (pullDisplayName === m.name || pullState.name === m.name);
         return `
           <tr>
             <td class="model-name" data-copy-model="${escapeHTML(m.name)}" title="Click to copy">${escapeHTML(m.name)} ${downloading ? `<span class="download-badge">Downloading ${pullState.percent || 0}%</span>` : ''}</td>
@@ -446,6 +460,7 @@
     $('dismissUpdateBtn').onclick = () => $('updateBanner').classList.remove('open');
     $('updateBtn').onclick = startUpdate;
     $('checkUpdateBtn').onclick = () => checkForUpdates(true);
+    $('settingsUpdateBtn').onclick = startUpdate;
     $('launchAtLogin').addEventListener('change', saveSettings);
     $('autoCheckUpdate').addEventListener('change', saveSettings);
 
@@ -611,6 +626,8 @@
         if (manual) $('manualUpdateStatus').textContent = 'Update check failed.';
         return;
       }
+      availableUpdate = info.available ? info : null;
+      $('settingsUpdateBtn').style.display = info.available ? '' : 'none';
       if (!info.available) {
         if (manual) $('manualUpdateStatus').textContent = info.current === 'dev' ? 'Update checks are disabled for dev builds.' : `You are up to date. Current version: ${info.current}.`;
         return;
@@ -622,13 +639,20 @@
 
     async function startUpdate() {
       $('updateBtn').disabled = true;
+      $('settingsUpdateBtn').disabled = true;
+      $('checkUpdateBtn').disabled = true;
       $('dismissUpdateBtn').disabled = true;
       $('updateProgress').classList.add('open');
+      $('settingsUpdateProgress').classList.add('open');
       $('updateText').textContent = 'Preparing update download...';
+      $('manualUpdateStatus').textContent = availableUpdate?.latest ? `Downloading ${availableUpdate.latest}...` : 'Preparing update download...';
       const state = await fetch('/api/update/download', {method:'POST'}).then(r => r.json()).catch((error) => ({error:error.message}));
       if (state.error) {
         $('updateText').textContent = state.error;
+        $('manualUpdateStatus').textContent = state.error;
         $('updateBtn').disabled = false;
+        $('settingsUpdateBtn').disabled = false;
+        $('checkUpdateBtn').disabled = false;
         $('dismissUpdateBtn').disabled = false;
         return;
       }
@@ -641,17 +665,27 @@
       if (state.error) {
         clearInterval(updatePoll);
         $('updateText').textContent = state.error;
+        $('manualUpdateStatus').textContent = state.error;
         $('updateBtn').disabled = false;
+        $('settingsUpdateBtn').disabled = false;
+        $('checkUpdateBtn').disabled = false;
         $('dismissUpdateBtn').disabled = false;
         return;
       }
       const percent = state.percent || 0;
       $('updateFill').style.width = `${percent}%`;
+      $('settingsUpdateFill').style.width = `${percent}%`;
       $('updateText').textContent = state.total > 0 ? `Downloading ${state.assetName}: ${percent}%` : `Downloading ${state.assetName}...`;
+      $('manualUpdateStatus').textContent = state.total > 0 ? `Downloading ${state.assetName}: ${percent}%` : `Downloading ${state.assetName}...`;
       if (state.done) {
         clearInterval(updatePoll);
         $('updateFill').style.width = '100%';
+        $('settingsUpdateFill').style.width = '100%';
         $('updateText').textContent = 'Download complete. Opening installer and closing Nucleus...';
+        $('manualUpdateStatus').textContent = 'Download complete. Opening installer and closing Nucleus...';
+        setTimeout(() => {
+          window.location.href = 'nucleus://quit';
+        }, 500);
       }
     }
   </script>

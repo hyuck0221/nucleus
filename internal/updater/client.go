@@ -171,7 +171,7 @@ func (c *Client) downloadAndOpen(check CheckResult) {
 		c.fail(err)
 		return
 	}
-	time.AfterFunc(1200*time.Millisecond, func() {
+	time.AfterFunc(3*time.Second, func() {
 		os.Exit(0)
 	})
 }
