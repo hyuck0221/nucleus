@@ -14,16 +14,22 @@
     header { display:flex; align-items:center; justify-content:space-between; padding:18px 22px; border-bottom:1px solid var(--line); background:#14171a; position:sticky; top:0; z-index:2; }
     h1 { display:flex; align-items:center; gap:10px; font-size:19px; margin:0; letter-spacing:0; }
     .brand-logo { width:28px; height:28px; border-radius:6px; display:block; }
-    button, input, select { font:inherit; }
+    button, input, select, textarea { font:inherit; }
     main { padding:22px; display:grid; gap:18px; max-width:1280px; margin:0 auto; }
     .grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; }
+    .view { display:none; }
+    .view.active { display:grid; }
     .panel { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:16px; min-width:0; }
     .metric { color:var(--muted); font-size:13px; margin-bottom:8px; }
     .value { font-size:24px; font-weight:700; overflow-wrap:anywhere; }
     .ok { color:var(--ok); } .warn { color:var(--warn); } .bad { color:var(--bad); }
     .toolbar { display:flex; gap:8px; flex-wrap:wrap; align-items:flex-start; }
+    .top-tabs { display:flex; gap:6px; padding:4px; border:1px solid var(--line); border-radius:8px; background:#101318; }
+    .top-tab { background:transparent; color:var(--muted); border:0; padding:7px 11px; font-size:13px; }
+    .top-tab.active { color:#071019; background:var(--accent); }
     .model-search { position:relative; min-width:220px; }
-    input, select { background:#0f1114; color:var(--text); border:1px solid var(--line); border-radius:7px; padding:9px 10px; width:100%; min-width:0; user-select:text; -webkit-user-select:text; }
+    input, select, textarea { background:#0f1114; color:var(--text); border:1px solid var(--line); border-radius:7px; padding:9px 10px; width:100%; min-width:0; user-select:text; -webkit-user-select:text; }
+    textarea { resize:vertical; line-height:1.45; }
     button { background:var(--accent); color:#071019; border:0; border-radius:7px; padding:9px 12px; font-weight:700; cursor:pointer; }
     button:disabled { cursor:not-allowed; opacity:.62; }
     .icon-btn { display:inline-flex; align-items:center; gap:7px; min-height:36px; }
@@ -110,6 +116,24 @@
     .progress-detail { color:var(--muted); font-size:12px; min-height:16px; }
     .panel-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:8px; }
     .panel-head .metric { margin-bottom:0; }
+    .chat-layout { display:grid; grid-template-columns:minmax(0,1.4fr) minmax(280px,.8fr); gap:14px; align-items:stretch; }
+    .chat-console { min-height:460px; display:grid; grid-template-rows:auto minmax(220px,1fr) auto; gap:10px; }
+    .chat-toolbar { display:grid; grid-template-columns:minmax(180px,1fr) auto; gap:8px; align-items:center; }
+    .chat-log { display:grid; align-content:start; gap:10px; min-height:260px; max-height:520px; overflow:auto; padding:12px; border:1px solid var(--line); border-radius:8px; background:#0f1114; }
+    .chat-empty { color:var(--muted); font-size:13px; align-self:center; justify-self:center; text-align:center; }
+    .chat-message { display:grid; gap:5px; max-width:86%; padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:#151a20; overflow-wrap:anywhere; white-space:pre-wrap; line-height:1.45; font-size:14px; }
+    .chat-message.user { justify-self:end; background:#142333; border-color:#25415b; }
+    .chat-message.assistant { justify-self:start; background:#141d18; border-color:#273d2f; }
+    .chat-message.error { justify-self:start; background:#2a151a; border-color:#59303a; color:#ffd8de; }
+    .chat-role { color:var(--muted); font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
+    .chat-form { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; align-items:end; }
+    .chat-form textarea { min-height:74px; max-height:180px; }
+    .guide-panel { display:grid; gap:12px; align-content:start; }
+    .guide-card { display:grid; gap:7px; padding:12px; border:1px solid var(--line); border-radius:8px; background:#12161b; }
+    .guide-card strong { font-size:13px; }
+    .guide-card span, .guide-card li { color:var(--muted); font-size:12px; line-height:1.45; }
+    .guide-card ul { margin:0; padding-left:18px; }
+    .code-block { margin:0; padding:12px; border:1px solid var(--line); border-radius:8px; background:#0c0f12; color:#dce8f3; overflow:auto; user-select:text; -webkit-user-select:text; font-size:12px; line-height:1.45; white-space:pre-wrap; }
     .tabs { display:flex; gap:6px; flex-wrap:wrap; }
     .tab-btn { background:#11161c; color:var(--muted); border:1px solid var(--line); padding:5px 9px; font-size:12px; }
     .tab-btn.active { color:#071019; background:var(--accent); border-color:var(--accent); }
@@ -121,12 +145,16 @@
     th { color:var(--muted); font-weight:600; }
     .span2 { grid-column:span 2; }
     .span4 { grid-column:span 4; }
-    @media (max-width:900px) { .grid { grid-template-columns:1fr; } .span2,.span4 { grid-column:auto; } header { align-items:flex-start; gap:10px; flex-direction:column; } .update-banner { top:108px; align-items:flex-start; flex-direction:column; } .update-actions, .update-progress { width:100%; } .toolbar, .download-row, .model-search, .tool-grid { width:100%; grid-template-columns:1fr; } .panel-head { align-items:flex-start; flex-direction:column; } #openExportBtn, #openDownloadBtn, #pullBtn, #hfSearchBtn { width:100%; } .hf-results { max-height:240px; } .hf-card { grid-template-columns:minmax(0,1fr) auto; } }
+    @media (max-width:900px) { .grid { grid-template-columns:1fr; } .span2,.span4 { grid-column:auto; } header { align-items:flex-start; gap:10px; flex-direction:column; } .top-tabs, .toolbar { width:100%; } .top-tab { flex:1; } .update-banner { top:156px; align-items:flex-start; flex-direction:column; } .update-actions, .update-progress { width:100%; } .toolbar, .download-row, .model-search, .tool-grid, .chat-layout, .chat-toolbar, .chat-form { width:100%; grid-template-columns:1fr; } .panel-head { align-items:flex-start; flex-direction:column; } #openExportBtn, #openDownloadBtn, #pullBtn, #hfSearchBtn, #chatSendBtn { width:100%; } .hf-results { max-height:240px; } .hf-card { grid-template-columns:minmax(0,1fr) auto; } .chat-message { max-width:100%; } }
   </style>
 </head>
 <body>
   <header>
     <h1><img class="brand-logo" src="/assets/icons/favicon-32.png" alt="">Nucleus</h1>
+    <nav class="top-tabs" aria-label="Primary">
+      <button class="top-tab active" type="button" data-view-tab="dashboard" aria-controls="dashboardView">Dashboard</button>
+      <button class="top-tab" type="button" data-view-tab="api" aria-controls="apiView">API</button>
+    </nav>
     <div class="toolbar">
       <button id="openExportBtn" class="ghost-btn icon-btn" type="button" title="Export">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m17 8-5-5-5 5"/><path d="M5 21h14"/></svg>
@@ -134,7 +162,7 @@
       </button>
       <button id="openDownloadBtn" class="icon-btn" type="button" title="Download model">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
-        Download model
+        Model
       </button>
       <button id="openSettingsBtn" class="ghost-btn icon-btn icon-only" type="button" title="Settings" aria-label="Settings">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.7 3.4 9 5.8a7.8 7.8 0 0 0-1.2.7L5.4 5.9 3.9 8.5l1.7 1.8a7 7 0 0 0 0 1.4l-1.7 1.8 1.5 2.6 2.4-.6c.4.3.8.5 1.2.7l.7 2.4h3l.7-2.4c.4-.2.8-.4 1.2-.7l2.4.6 1.5-2.6-1.7-1.8a7 7 0 0 0 0-1.4l1.7-1.8-1.5-2.6-2.4.6c-.4-.3-.8-.5-1.2-.7l-.7-2.4h-3Z"/><circle cx="11.2" cy="12" r="2.5"/></svg>
@@ -323,7 +351,7 @@
     </div>
   </dialog>
   <main>
-    <section class="grid">
+    <section id="dashboardView" class="view grid active">
       <div class="panel"><div class="metric">Ollama</div><div id="ollama" class="value warn">checking</div></div>
       <div class="panel"><div class="metric">Active users</div><div id="activeUsers" class="value">0</div></div>
       <div class="panel"><div class="metric">Active requests</div><div id="activeRequests" class="value">0</div></div>
@@ -343,6 +371,49 @@
       <div class="panel span2">
         <div class="metric">Active now</div>
         <table><thead><tr><th>User</th><th>Model</th><th>Client</th><th>Started</th><th></th></tr></thead><tbody id="active"></tbody></table>
+      </div>
+    </section>
+    <section id="apiView" class="view grid">
+      <div class="panel span4">
+        <div class="panel-head">
+          <div>
+            <div class="metric">API playground</div>
+            <div class="section-title">Session-only chat test</div>
+          </div>
+          <button id="chatClearBtn" class="ghost-btn" type="button">Clear chat</button>
+        </div>
+        <div class="chat-layout">
+          <div class="chat-console">
+            <div class="chat-toolbar">
+              <select id="chatModel" aria-label="Chat model"></select>
+              <div id="chatStatus" class="export-status">Loading installed models...</div>
+            </div>
+            <div id="chatLog" class="chat-log" aria-live="polite"></div>
+            <div class="chat-form">
+              <textarea id="chatInput" placeholder="Ask the selected local model..." aria-label="Chat message"></textarea>
+              <button id="chatSendBtn" type="button">Send</button>
+            </div>
+          </div>
+          <div class="guide-panel">
+            <div class="guide-card">
+              <strong>How this test works</strong>
+              <ul>
+                <li>The selector only shows models installed in Ollama.</li>
+                <li>Messages stay in this browser session and are not persisted.</li>
+                <li>Each send calls the OpenAI-compatible chat endpoint with the selected model.</li>
+              </ul>
+            </div>
+            <div class="guide-card">
+              <strong>Endpoint</strong>
+              <span id="apiEndpointText">POST /v1/chat/completions</span>
+            </div>
+            <div class="guide-card">
+              <strong>curl example</strong>
+              <pre id="apiCurlExample" class="code-block"></pre>
+              <button id="copyCurlBtn" class="ghost-btn" type="button">Copy curl</button>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="panel span4">
         <div class="panel-head">
@@ -384,6 +455,8 @@
     let modelPage = 1;
     let usagePage = 1;
     let usageTab = 'all';
+    let chatMessages = [];
+    let chatBusy = false;
     const modelPageSize = 5;
     const usagePageSize = 50;
     const displayModelName = (name) => {
@@ -405,6 +478,7 @@
       $('recentModel').textContent = status.recent[0]?.model || 'none';
       cachedModels = models.models || [];
       recentRecords = status.recent || [];
+      renderChatModels();
       renderModels();
       renderUsage();
       $('active').innerHTML = status.active.map(r => `<tr><td>${escapeHTML(r.user)}</td><td>${escapeHTML(r.model)}</td><td>${escapeHTML(r.client)}</td><td>${fmtTime(r.startedAt)}</td><td class="actions"><button class="danger-btn" type="button" data-stop-request="${escapeHTML(r.id)}">Stop</button></td></tr>`).join('') || '<tr><td colspan="5">No active requests</td></tr>';
@@ -456,6 +530,92 @@
       $('usagePageInfo').textContent = `${usagePage} / ${totalPages} · ${records.length} records`;
       $('usagePrev').disabled = usagePage <= 1;
       $('usageNext').disabled = usagePage >= totalPages;
+    }
+
+    function renderChatModels() {
+      const selected = $('chatModel').value;
+      $('chatModel').innerHTML = cachedModels.map((model) => `<option value="${escapeHTML(model.name)}">${escapeHTML(model.name)}</option>`).join('');
+      if (cachedModels.some((model) => model.name === selected)) {
+        $('chatModel').value = selected;
+      }
+      const current = $('chatModel').value || cachedModels[0]?.name || '';
+      $('chatStatus').textContent = current ? `${cachedModels.length} installed models available.` : 'No installed models. Download a model first.';
+      $('chatSendBtn').disabled = chatBusy || !current;
+      renderApiGuide();
+    }
+
+    function renderChat() {
+      if (!chatMessages.length) {
+        $('chatLog').innerHTML = '<div class="chat-empty">Send a message to test the local API.</div>';
+        return;
+      }
+      $('chatLog').innerHTML = chatMessages.map((message) => `
+        <div class="chat-message ${escapeHTML(message.role)}">
+          <div class="chat-role">${escapeHTML(message.role)}</div>
+          <div>${escapeHTML(message.content)}</div>
+        </div>
+      `).join('');
+      $('chatLog').scrollTop = $('chatLog').scrollHeight;
+    }
+
+    function renderApiGuide() {
+      const origin = window.location.origin;
+      const model = $('chatModel').value || cachedModels[0]?.name || 'llama3.2';
+      $('apiEndpointText').textContent = `${origin}/v1/chat/completions`;
+      $('apiCurlExample').textContent = `curl ${origin}/v1/chat/completions \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "${model}",
+    "messages": [
+      {"role": "user", "content": "Say hello from Nucleus"}
+    ]
+  }'`;
+    }
+
+    function selectView(view) {
+      const next = view === 'api' ? 'api' : 'dashboard';
+      $('dashboardView').classList.toggle('active', next === 'dashboard');
+      $('apiView').classList.toggle('active', next === 'api');
+      document.querySelectorAll('[data-view-tab]').forEach((button) => {
+        const active = button.dataset.viewTab === next;
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-selected', String(active));
+      });
+      window.location.hash = next === 'api' ? 'api' : '';
+      if (next === 'api') renderApiGuide();
+    }
+
+    async function sendChatMessage() {
+      const model = $('chatModel').value;
+      const content = $('chatInput').value.trim();
+      if (!model || !content || chatBusy) return;
+      chatMessages.push({role:'user', content});
+      $('chatInput').value = '';
+      chatBusy = true;
+      $('chatSendBtn').disabled = true;
+      $('chatStatus').textContent = `Calling ${model}...`;
+      renderChat();
+      try {
+        const response = await fetch('/v1/chat/completions', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({model, stream:false, messages:chatMessages.filter((message) => message.role !== 'error')})
+        });
+        const text = await response.text();
+        if (!response.ok) throw new Error(text || `Request failed with ${response.status}`);
+        const data = JSON.parse(text);
+        const reply = data.choices?.[0]?.message?.content || data.message?.content || '';
+        chatMessages.push({role:'assistant', content:reply || '(empty response)'});
+        $('chatStatus').textContent = `Last call completed with ${model}.`;
+      } catch (error) {
+        chatMessages.push({role:'error', content:error.message});
+        $('chatStatus').textContent = 'API call failed.';
+      } finally {
+        chatBusy = false;
+        $('chatSendBtn').disabled = !$('chatModel').value;
+        renderChat();
+        refresh();
+      }
     }
 
     function setPullProgress(name, update) {
@@ -693,6 +853,32 @@
     $('contextSizeDial').addEventListener('input', (event) => syncContextSize(event.target.value));
     $('contextSize').addEventListener('change', (event) => syncContextSize(event.target.value));
     syncContextSize($('contextSize').value);
+    document.querySelectorAll('[data-view-tab]').forEach((button) => {
+      button.onclick = () => selectView(button.dataset.viewTab);
+    });
+    $('chatSendBtn').onclick = sendChatMessage;
+    $('chatClearBtn').onclick = () => {
+      chatMessages = [];
+      $('chatStatus').textContent = $('chatModel').value ? 'Chat cleared.' : 'No installed models. Download a model first.';
+      renderChat();
+    };
+    $('chatModel').addEventListener('change', () => {
+      $('chatStatus').textContent = `Selected ${$('chatModel').value}.`;
+      renderApiGuide();
+    });
+    $('chatInput').addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        sendChatMessage();
+      }
+    });
+    $('copyCurlBtn').onclick = async () => {
+      await copyText($('apiCurlExample').textContent);
+      showToast('Copied curl example');
+    };
+    renderChat();
+    renderApiGuide();
+    selectView(window.location.hash.replace('#', '') === 'api' ? 'api' : 'dashboard');
 
     $('pullBtn').onclick = () => {
       pullModel($('modelName').value.trim());
