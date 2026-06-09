@@ -117,15 +117,22 @@
     .panel-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:8px; }
     .panel-head .metric { margin-bottom:0; }
     .chat-layout { display:grid; grid-template-columns:minmax(0,1.4fr) minmax(280px,.8fr); gap:14px; align-items:stretch; }
-    .chat-console { min-height:460px; display:grid; grid-template-rows:auto minmax(220px,1fr) auto; gap:10px; }
+    .chat-console { height:560px; min-height:0; display:grid; grid-template-rows:auto minmax(0,1fr) auto; gap:10px; }
     .chat-toolbar { display:grid; grid-template-columns:minmax(180px,1fr) auto; gap:8px; align-items:center; }
-    .chat-log { display:grid; align-content:start; gap:10px; min-height:260px; max-height:520px; overflow:auto; padding:12px; border:1px solid var(--line); border-radius:8px; background:#0f1114; }
+    .chat-log { display:grid; align-content:start; gap:10px; min-height:0; overflow:auto; padding:12px; border:1px solid var(--line); border-radius:8px; background:#0f1114; }
     .chat-empty { color:var(--muted); font-size:13px; align-self:center; justify-self:center; text-align:center; }
     .chat-message { display:grid; gap:5px; max-width:86%; padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:#151a20; overflow-wrap:anywhere; white-space:pre-wrap; line-height:1.45; font-size:14px; }
     .chat-message.user { justify-self:end; background:#142333; border-color:#25415b; }
     .chat-message.assistant { justify-self:start; background:#141d18; border-color:#273d2f; }
     .chat-message.error { justify-self:start; background:#2a151a; border-color:#59303a; color:#ffd8de; }
     .chat-role { color:var(--muted); font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
+    .chat-content { display:grid; gap:7px; }
+    .chat-content h1, .chat-content h2, .chat-content h3 { margin:0; line-height:1.25; letter-spacing:0; }
+    .chat-content h1 { font-size:20px; }
+    .chat-content h2 { font-size:17px; }
+    .chat-content h3 { font-size:15px; }
+    .chat-content p { margin:0; }
+    .chat-content code { padding:1px 4px; border:1px solid var(--line); border-radius:5px; background:#0c0f12; font-size:12px; }
     .chat-form { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; align-items:end; }
     .chat-form textarea { min-height:74px; max-height:180px; }
     .guide-panel { display:grid; gap:12px; align-content:start; }
@@ -134,6 +141,13 @@
     .guide-card span, .guide-card li { color:var(--muted); font-size:12px; line-height:1.45; }
     .guide-card ul { margin:0; padding-left:18px; }
     .code-block { margin:0; padding:12px; border:1px solid var(--line); border-radius:8px; background:#0c0f12; color:#dce8f3; overflow:auto; user-select:text; -webkit-user-select:text; font-size:12px; line-height:1.45; white-space:pre-wrap; }
+    .perf-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+    .perf-field { display:grid; gap:6px; }
+    .perf-field label { color:var(--muted); font-size:12px; font-weight:700; }
+    .perf-field small { color:var(--muted); font-size:11px; line-height:1.35; }
+    .perf-control { display:grid; grid-template-columns:minmax(0,1fr) 92px; gap:8px; align-items:center; }
+    .perf-footer { display:flex; gap:8px; align-items:center; justify-content:flex-end; flex-wrap:wrap; padding-top:12px; }
+    .inline-note { color:var(--muted); font-size:12px; min-height:18px; overflow-wrap:anywhere; }
     .tabs { display:flex; gap:6px; flex-wrap:wrap; }
     .tab-btn { background:#11161c; color:var(--muted); border:1px solid var(--line); padding:5px 9px; font-size:12px; }
     .tab-btn.active { color:#071019; background:var(--accent); border-color:var(--accent); }
@@ -145,7 +159,7 @@
     th { color:var(--muted); font-weight:600; }
     .span2 { grid-column:span 2; }
     .span4 { grid-column:span 4; }
-    @media (max-width:900px) { .grid { grid-template-columns:1fr; } .span2,.span4 { grid-column:auto; } header { align-items:flex-start; gap:10px; flex-direction:column; } .top-tabs, .toolbar { width:100%; } .top-tab { flex:1; } .update-banner { top:156px; align-items:flex-start; flex-direction:column; } .update-actions, .update-progress { width:100%; } .toolbar, .download-row, .model-search, .tool-grid, .chat-layout, .chat-toolbar, .chat-form { width:100%; grid-template-columns:1fr; } .panel-head { align-items:flex-start; flex-direction:column; } #openExportBtn, #openDownloadBtn, #pullBtn, #hfSearchBtn, #chatSendBtn { width:100%; } .hf-results { max-height:240px; } .hf-card { grid-template-columns:minmax(0,1fr) auto; } .chat-message { max-width:100%; } }
+    @media (max-width:900px) { .grid { grid-template-columns:1fr; } .span2,.span4 { grid-column:auto; } header { align-items:flex-start; gap:10px; flex-direction:column; } .top-tabs, .toolbar { width:100%; } .top-tab { flex:1; } .update-banner { top:156px; align-items:flex-start; flex-direction:column; } .update-actions, .update-progress { width:100%; } .toolbar, .download-row, .model-search, .tool-grid, .chat-layout, .chat-toolbar, .chat-form, .perf-grid { width:100%; grid-template-columns:1fr; } .panel-head { align-items:flex-start; flex-direction:column; } #openExportBtn, #openDownloadBtn, #pullBtn, #hfSearchBtn, #chatSendBtn { width:100%; } .hf-results { max-height:240px; } .hf-card { grid-template-columns:minmax(0,1fr) auto; } .chat-message { max-width:100%; } .chat-console { height:520px; } }
   </style>
 </head>
 <body>
@@ -347,6 +361,89 @@
           <button id="settingsUpdateBtn" type="button" style="display:none">Install</button>
         </div>
       </div>
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <div class="metric">Ollama performance</div>
+            <div id="performanceStatus" class="section-title">Loading runtime limits...</div>
+          </div>
+          <div class="settings-update-actions">
+            <button id="restartOllamaBtn" class="ghost-btn" type="button">Restart Ollama</button>
+            <button id="savePerformanceBtn" type="button">Apply</button>
+          </div>
+        </div>
+        <div class="perf-grid">
+          <div class="perf-field">
+            <label for="perfNumParallel">Parallel requests per model</label>
+            <div class="perf-control">
+              <input id="perfNumParallelDial" type="range" min="1" step="1" aria-label="Parallel requests per model dial">
+              <input id="perfNumParallel" type="number" min="1" step="1">
+            </div>
+            <small id="perfNumParallelHint"></small>
+          </div>
+          <div class="perf-field">
+            <label for="perfMaxLoadedModels">Max loaded models</label>
+            <div class="perf-control">
+              <input id="perfMaxLoadedModelsDial" type="range" min="1" step="1" aria-label="Max loaded models dial">
+              <input id="perfMaxLoadedModels" type="number" min="1" step="1">
+            </div>
+            <small id="perfMaxLoadedModelsHint"></small>
+          </div>
+          <div class="perf-field">
+            <label for="perfContextLength">Default context length</label>
+            <div class="perf-control">
+              <input id="perfContextLengthDial" type="range" min="1024" step="1024" aria-label="Default context length dial">
+              <input id="perfContextLength" type="number" min="1024" step="1024">
+            </div>
+            <small id="perfContextLengthHint"></small>
+          </div>
+          <div class="perf-field">
+            <label for="perfMaxQueue">Max queue</label>
+            <div class="perf-control">
+              <input id="perfMaxQueueDial" type="range" min="1" step="1" aria-label="Max queue dial">
+              <input id="perfMaxQueue" type="number" min="1" step="1">
+            </div>
+            <small id="perfMaxQueueHint"></small>
+          </div>
+          <div class="perf-field">
+            <label for="perfCPUThreads">CPU threads</label>
+            <div class="perf-control">
+              <input id="perfCPUThreadsDial" type="range" min="1" step="1" aria-label="CPU threads dial">
+              <input id="perfCPUThreads" type="number" min="1" step="1">
+            </div>
+            <small id="perfCPUThreadsHint"></small>
+          </div>
+          <div class="perf-field">
+            <label for="perfKeepAlive">Keep alive</label>
+            <input id="perfKeepAlive" placeholder="5m, 24h, -1, 0">
+            <small>How long Ollama keeps a model loaded after use.</small>
+          </div>
+          <div class="perf-field">
+            <label for="perfKVCacheType">KV cache type</label>
+            <select id="perfKVCacheType">
+              <option value="f16">f16</option>
+              <option value="q8_0">q8_0</option>
+              <option value="q4_0">q4_0</option>
+            </select>
+            <small>Lower precision reduces memory use for long contexts.</small>
+          </div>
+          <div class="settings-row">
+            <div>
+              <strong>Flash Attention</strong>
+              <span>Can reduce memory use when context is large.</span>
+            </div>
+            <label class="switch">
+              <input id="perfFlashAttention" type="checkbox">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="guide-card">
+            <strong>Applied environment</strong>
+            <span id="perfAppliedEnv">Not loaded yet.</span>
+          </div>
+        </div>
+        <div id="perfRestartNote" class="inline-note"></div>
+      </div>
       <div id="settingsStatus" class="settings-status"></div>
     </div>
   </dialog>
@@ -400,7 +497,7 @@
               <ul>
                 <li>The selector only shows models installed in Ollama.</li>
                 <li>Messages stay in this browser session and are not persisted.</li>
-                <li>Each send calls the OpenAI-compatible chat endpoint with the selected model.</li>
+                <li>Each send streams from the OpenAI-compatible chat endpoint.</li>
               </ul>
             </div>
             <div class="guide-card">
@@ -414,6 +511,24 @@
             </div>
           </div>
         </div>
+      </div>
+      <div class="panel span2">
+        <div class="metric">Processing now</div>
+        <table><thead><tr><th>Model</th><th>User</th><th>Client</th><th>Started</th><th></th></tr></thead><tbody id="apiActive"></tbody></table>
+      </div>
+      <div class="panel span2">
+        <div class="panel-head">
+          <div>
+            <div class="metric">Loaded in Ollama</div>
+            <div id="loadedModelSummary" class="section-title">Checking...</div>
+          </div>
+          <div class="settings-update-actions">
+            <button id="preloadModelBtn" class="ghost-btn" type="button">Preload</button>
+            <button id="stopModelBtn" class="ghost-btn" type="button">Unload</button>
+            <button id="refreshPerformanceBtn" class="ghost-btn" type="button">Refresh</button>
+          </div>
+        </div>
+        <table><thead><tr><th>Model</th><th>RAM</th><th>VRAM</th><th>Until</th></tr></thead><tbody id="loadedModels"></tbody></table>
       </div>
       <div class="panel span4">
         <div class="panel-head">
@@ -457,6 +572,7 @@
     let usageTab = 'all';
     let chatMessages = [];
     let chatBusy = false;
+    let performanceState = null;
     const modelPageSize = 5;
     const usagePageSize = 50;
     const displayModelName = (name) => {
@@ -482,6 +598,7 @@
       renderModels();
       renderUsage();
       $('active').innerHTML = status.active.map(r => `<tr><td>${escapeHTML(r.user)}</td><td>${escapeHTML(r.model)}</td><td>${escapeHTML(r.client)}</td><td>${fmtTime(r.startedAt)}</td><td class="actions"><button class="danger-btn" type="button" data-stop-request="${escapeHTML(r.id)}">Stop</button></td></tr>`).join('') || '<tr><td colspan="5">No active requests</td></tr>';
+      $('apiActive').innerHTML = status.active.map(r => `<tr><td>${escapeHTML(r.model)}</td><td>${escapeHTML(r.user)}</td><td>${escapeHTML(r.client)}</td><td>${fmtTime(r.startedAt)}</td><td class="actions"><button class="danger-btn" type="button" data-stop-request="${escapeHTML(r.id)}">Stop</button></td></tr>`).join('') || '<tr><td colspan="5">No active requests</td></tr>';
     }
 
     function renderModels() {
@@ -552,10 +669,33 @@
       $('chatLog').innerHTML = chatMessages.map((message) => `
         <div class="chat-message ${escapeHTML(message.role)}">
           <div class="chat-role">${escapeHTML(message.role)}</div>
-          <div>${escapeHTML(message.content)}</div>
+          <div class="chat-content">${renderMarkdown(message.content)}</div>
         </div>
       `).join('');
       $('chatLog').scrollTop = $('chatLog').scrollHeight;
+    }
+
+    function renderMarkdown(value) {
+      const inline = (text) => escapeHTML(text)
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        .replace(/\*\*\*([^*]+)\*\*\*/g, '<strong><em>$1</em></strong>')
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*([^*]+)\*/g, '<em>$1</em>');
+      return String(value || '').split('\n').map((line) => {
+        const h1 = line.match(/^#\s+(.+)$/);
+        if (h1) return `<h1>${inline(h1[1])}</h1>`;
+        const h2 = line.match(/^##\s+(.+)$/);
+        if (h2) return `<h2>${inline(h2[1])}</h2>`;
+        const h3 = line.match(/^###\s+(.+)$/);
+        if (h3) return `<h3>${inline(h3[1])}</h3>`;
+        return line.trim() ? `<p>${inline(line)}</p>` : '<p><br></p>';
+      }).join('');
+    }
+
+    function updateChatMessage(index, content) {
+      if (!chatMessages[index]) return;
+      chatMessages[index].content = content;
+      renderChat();
     }
 
     function renderApiGuide() {
@@ -566,6 +706,7 @@
   -H "Content-Type: application/json" \\
   -d '{
     "model": "${model}",
+    "stream": true,
     "messages": [
       {"role": "user", "content": "Say hello from Nucleus"}
     ]
@@ -583,6 +724,7 @@
       });
       window.location.hash = next === 'api' ? 'api' : '';
       if (next === 'api') renderApiGuide();
+      if (next === 'api') loadPerformance();
     }
 
     async function sendChatMessage() {
@@ -595,25 +737,170 @@
       $('chatSendBtn').disabled = true;
       $('chatStatus').textContent = `Calling ${model}...`;
       renderChat();
+      const assistantIndex = chatMessages.push({role:'assistant', content:''}) - 1;
+      let streamed = '';
       try {
         const response = await fetch('/v1/chat/completions', {
           method:'POST',
           headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({model, stream:false, messages:chatMessages.filter((message) => message.role !== 'error')})
+          body:JSON.stringify({model, stream:true, messages:chatMessages.filter((message) => message.role !== 'error' && message.content !== '')})
         });
-        const text = await response.text();
-        if (!response.ok) throw new Error(text || `Request failed with ${response.status}`);
-        const data = JSON.parse(text);
-        const reply = data.choices?.[0]?.message?.content || data.message?.content || '';
-        chatMessages.push({role:'assistant', content:reply || '(empty response)'});
-        $('chatStatus').textContent = `Last call completed with ${model}.`;
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(text || `Request failed with ${response.status}`);
+        }
+        if (!response.body) throw new Error('Streaming response is not available.');
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        while (true) {
+          const {done, value} = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, {stream:true});
+          const events = buffer.split('\n\n');
+          buffer = events.pop();
+          for (const eventText of events) {
+            const payloads = eventText.split('\n')
+              .filter((line) => line.startsWith('data:'))
+              .map((line) => line.slice(5).trim());
+            for (const payload of payloads) {
+              if (!payload || payload === '[DONE]') continue;
+              const data = JSON.parse(payload);
+              streamed += data.choices?.[0]?.delta?.content || data.choices?.[0]?.message?.content || '';
+              updateChatMessage(assistantIndex, streamed || '(waiting for response...)');
+            }
+          }
+        }
+        updateChatMessage(assistantIndex, streamed || '(empty response)');
+        $('chatStatus').textContent = `Streaming completed with ${model}.`;
       } catch (error) {
-        chatMessages.push({role:'error', content:error.message});
+        chatMessages.splice(assistantIndex, 1, {role:'error', content:error.message});
         $('chatStatus').textContent = 'API call failed.';
       } finally {
         chatBusy = false;
         $('chatSendBtn').disabled = !$('chatModel').value;
         renderChat();
+        refresh();
+        loadPerformance();
+      }
+    }
+
+    async function loadPerformance() {
+      performanceState = await fetch('/api/ollama/performance').then(r => {
+        if (!r.ok) throw new Error('Failed to load Ollama performance settings');
+        return r.json();
+      }).catch((error) => ({error:error.message, settings:{}, limits:{}, applied:{}, runningModels:[]}));
+      renderPerformance();
+    }
+
+    function renderPerformance() {
+      const state = performanceState || {};
+      const settings = state.settings || {};
+      const limits = state.limits || {};
+      $('performanceStatus').textContent = state.error || state.message || `${limits.logicalCpu || '-'} logical CPU · ${fmtBytes(limits.memoryBytes)} memory`;
+      setPerfControl('perfNumParallel', settings.numParallel || 1, limits.numParallelMax || 1, 1);
+      setPerfControl('perfMaxLoadedModels', settings.maxLoadedModels || 1, limits.maxLoadedModelsMax || 1, 1);
+      setPerfControl('perfContextLength', settings.contextLength || 4096, limits.contextLengthMax || 4096, 1024);
+      setPerfControl('perfMaxQueue', settings.maxQueue || 512, limits.maxQueueMax || 512, 1);
+      setPerfControl('perfCPUThreads', settings.cpuThreads || 1, limits.cpuThreadsMax || 1, 1);
+      $('perfKeepAlive').value = settings.keepAlive || '5m';
+      $('perfKVCacheType').value = settings.kvCacheType || 'f16';
+      $('perfFlashAttention').checked = !!settings.flashAttention;
+      $('perfNumParallelHint').textContent = `Max ${limits.numParallelMax || 1}. Higher values increase memory use.`;
+      $('perfMaxLoadedModelsHint').textContent = `Max ${limits.maxLoadedModelsMax || 1} for this machine.`;
+      $('perfContextLengthHint').textContent = `Max ${limits.contextLengthMax || 4096}. Context uses RAM/VRAM.`;
+      $('perfMaxQueueHint').textContent = `Max ${limits.maxQueueMax || 512}.`;
+      $('perfCPUThreadsHint').textContent = `Max ${limits.cpuThreadsMax || 1}. Lower values reduce CPU pressure.`;
+      const applied = state.applied || {};
+      $('perfAppliedEnv').textContent = Object.entries(applied).map(([key, value]) => `${key}=${value || '(unset)'}`).join('\n') || 'No environment values found.';
+      $('perfRestartNote').textContent = 'Ollama must be restarted after applying these values.';
+      const running = state.runningModels || [];
+      $('loadedModelSummary').textContent = state.runningModelError || `${running.length} loaded`;
+      $('loadedModels').innerHTML = running.map((model) => `<tr><td>${escapeHTML(model.name || model.model)}</td><td>${fmtBytes(model.size)}</td><td>${fmtBytes(model.size_vram)}</td><td>${fmtTime(model.expires_at)}</td></tr>`).join('') || '<tr><td colspan="4">No models loaded</td></tr>';
+    }
+
+    function setPerfControl(id, value, max, step) {
+      const input = $(id);
+      const dial = $(`${id}Dial`);
+      const min = Number(input.min || dial.min || 1);
+      const safeMax = Math.max(min, Number(max || min));
+      const safeStep = Math.max(1, Number(step || input.step || dial.step || 1));
+      const raw = Number(value || min);
+      const clamped = Math.min(safeMax, Math.max(min, raw));
+      const rounded = Math.round(clamped / safeStep) * safeStep;
+      input.max = safeMax;
+      input.step = safeStep;
+      input.value = rounded;
+      dial.max = safeMax;
+      dial.step = safeStep;
+      dial.value = rounded;
+    }
+
+    function syncPerfControl(id, value) {
+      const input = $(id);
+      const dial = $(`${id}Dial`);
+      const min = Number(input.min || 1);
+      const max = Number(input.max || dial.max || min);
+      const step = Number(input.step || dial.step || 1);
+      const raw = Number(value || min);
+      const clamped = Math.min(max, Math.max(min, raw));
+      const rounded = Math.round(clamped / step) * step;
+      input.value = rounded;
+      dial.value = rounded;
+    }
+
+    async function savePerformance() {
+      const payload = {
+        numParallel: Number($('perfNumParallel').value || 1),
+        maxLoadedModels: Number($('perfMaxLoadedModels').value || 1),
+        contextLength: Number($('perfContextLength').value || 4096),
+        maxQueue: Number($('perfMaxQueue').value || 512),
+        cpuThreads: Number($('perfCPUThreads').value || 1),
+        keepAlive: $('perfKeepAlive').value.trim() || '5m',
+        flashAttention: $('perfFlashAttention').checked,
+        kvCacheType: $('perfKVCacheType').value || 'f16'
+      };
+      $('savePerformanceBtn').disabled = true;
+      $('performanceStatus').textContent = 'Applying Ollama environment...';
+      performanceState = await fetch('/api/ollama/performance', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(payload)
+      }).then(r => {
+        if (!r.ok) return r.text().then((text) => { throw new Error(text || 'Failed to apply settings'); });
+        return r.json();
+      }).catch((error) => ({error:error.message, settings:payload, limits:performanceState?.limits || {}, applied:performanceState?.applied || {}, runningModels:performanceState?.runningModels || []}));
+      $('savePerformanceBtn').disabled = false;
+      renderPerformance();
+    }
+
+    async function controlOllama(action) {
+      const model = $('chatModel').value;
+      const needsModel = action === 'preload' || action === 'stop';
+      if (needsModel && !model) {
+        $('loadedModelSummary').textContent = 'Choose a model first.';
+        return;
+      }
+      if (action === 'restart' && !confirm('Restart Ollama now? Active model requests may stop.')) return;
+      const button = action === 'preload' ? $('preloadModelBtn') : action === 'stop' ? $('stopModelBtn') : $('restartOllamaBtn');
+      button.disabled = true;
+      const previous = $('loadedModelSummary').textContent;
+      $('loadedModelSummary').textContent = action === 'restart' ? 'Restarting Ollama...' : `${action === 'preload' ? 'Preloading' : 'Unloading'} ${model}...`;
+      try {
+        const response = await fetch(`/api/ollama/${action}`, {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: needsModel ? JSON.stringify({model}) : '{}'
+        });
+        if (!response.ok) throw new Error(await response.text());
+        const message = action === 'restart' ? 'Ollama restart requested.' : `${model} ${action === 'preload' ? 'preloaded' : 'unloaded'}.`;
+        $('loadedModelSummary').textContent = message;
+        showToast(message);
+      } catch (error) {
+        $('loadedModelSummary').textContent = error.message || previous;
+      } finally {
+        button.disabled = false;
+        setTimeout(loadPerformance, action === 'restart' ? 1800 : 500);
         refresh();
       }
     }
@@ -837,6 +1124,7 @@
     $('openSettingsBtn').onclick = () => {
       $('settingsDialog').showModal();
       loadSettings();
+      loadPerformance();
     };
     $('closeSettingsBtn').onclick = () => $('settingsDialog').close();
     $('dismissUpdateBtn').onclick = () => $('updateBanner').classList.remove('open');
@@ -876,6 +1164,15 @@
       await copyText($('apiCurlExample').textContent);
       showToast('Copied curl example');
     };
+    $('savePerformanceBtn').onclick = savePerformance;
+    $('refreshPerformanceBtn').onclick = loadPerformance;
+    $('preloadModelBtn').onclick = () => controlOllama('preload');
+    $('stopModelBtn').onclick = () => controlOllama('stop');
+    $('restartOllamaBtn').onclick = () => controlOllama('restart');
+    ['perfNumParallel', 'perfMaxLoadedModels', 'perfContextLength', 'perfMaxQueue', 'perfCPUThreads'].forEach((id) => {
+      $(`${id}Dial`).addEventListener('input', (event) => syncPerfControl(id, event.target.value));
+      $(id).addEventListener('change', (event) => syncPerfControl(id, event.target.value));
+    });
     renderChat();
     renderApiGuide();
     selectView(window.location.hash.replace('#', '') === 'api' ? 'api' : 'dashboard');
@@ -932,6 +1229,14 @@
       button.disabled = true;
       await fetch('/api/requests/stop', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id:button.dataset.stopRequest})});
       refresh();
+    });
+    $('apiActive').addEventListener('click', async (event) => {
+      const button = event.target.closest('[data-stop-request]');
+      if (!button) return;
+      button.disabled = true;
+      await fetch('/api/requests/stop', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id:button.dataset.stopRequest})});
+      refresh();
+      loadPerformance();
     });
 
     $('recent').addEventListener('click', async (event) => {

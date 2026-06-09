@@ -32,6 +32,15 @@ type Model struct {
 	Digest     string    `json:"digest"`
 }
 
+type RunningModel struct {
+	Name      string    `json:"name"`
+	Model     string    `json:"model"`
+	Size      int64     `json:"size"`
+	SizeVRAM  int64     `json:"size_vram"`
+	Digest    string    `json:"digest"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
 func New(baseURL string) *Client {
 	if baseURL == "" {
 		baseURL = "http://127.0.0.1:11434"
@@ -80,6 +89,48 @@ func (c *Client) Models(ctx context.Context) ([]Model, error) {
 		Models []Model `json:"models"`
 	}
 	return parsed.Models, json.NewDecoder(resp.Body).Decode(&parsed)
+}
+
+func (c *Client) RunningModels(ctx context.Context) ([]RunningModel, error) {
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, c.BaseURL+"/api/ps", nil)
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("ollama returned %s: %s", resp.Status, string(body))
+	}
+	var parsed struct {
+		Models []RunningModel `json:"models"`
+	}
+	return parsed.Models, json.NewDecoder(resp.Body).Decode(&parsed)
+}
+
+func (c *Client) Preload(ctx context.Context, model string) error {
+	payload, _ := json.Marshal(map[string]string{"model": model})
+	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, c.BaseURL+"/api/chat", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("ollama returned %s: %s", resp.Status, string(body))
+	}
+	_, _ = io.Copy(io.Discard, resp.Body)
+	return nil
+}
+
+func (c *Client) Stop(ctx context.Context, model string) error {
+	out, err := exec.CommandContext(ctx, "ollama", "stop", model).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("ollama stop failed: %w: %s", err, strings.TrimSpace(string(out)))
+	}
+	return nil
 }
 
 func (c *Client) Pull(ctx context.Context, model string, progress func([]byte)) error {

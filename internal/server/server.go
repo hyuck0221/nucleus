@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -57,6 +58,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/models/delete", s.deleteModel)
 	mux.HandleFunc("/api/huggingface/models", s.huggingFaceModels)
 	mux.HandleFunc("/api/settings", s.settings)
+	mux.HandleFunc("/api/ollama/performance", s.ollamaPerformance)
+	mux.HandleFunc("/api/ollama/preload", s.ollamaPreload)
+	mux.HandleFunc("/api/ollama/stop", s.ollamaStop)
+	mux.HandleFunc("/api/ollama/restart", s.ollamaRestart)
 	mux.HandleFunc("/api/export/cli-config/options", s.cliConfigExportOptions)
 	mux.HandleFunc("/api/export/cli-config/download", s.cliConfigExportDownload)
 	mux.HandleFunc("/api/update/check", s.updateCheck)
@@ -215,6 +220,127 @@ func (s *Server) settings(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+func (s *Server) ollamaPerformance(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		s.writeOllamaPerformance(w, "")
+	case http.MethodPost:
+		var req settings.OllamaPerformance
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		limits := performanceLimits()
+		next := clampOllamaPerformance(req, limits)
+		cfg := s.config.Get()
+		cfg.OllamaPerformance = next
+		if err := s.config.Save(cfg); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if err := applyOllamaEnvironment(next); err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+		s.writeOllamaPerformance(w, "Applied. Restart Ollama to use the new runtime limits.")
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func (s *Server) ollamaPreload(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	model, ok := modelFromJSONRequest(w, r)
+	if !ok {
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+	if err := s.ollama.Preload(ctx, model); err != nil {
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+	writeJSON(w, map[string]interface{}{"ok": true, "model": model, "action": "preload"})
+}
+
+func (s *Server) ollamaStop(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	model, ok := modelFromJSONRequest(w, r)
+	if !ok {
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+	if err := s.ollama.Stop(ctx, model); err != nil {
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+	writeJSON(w, map[string]interface{}{"ok": true, "model": model, "action": "stop"})
+}
+
+func (s *Server) ollamaRestart(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if runtime.GOOS != "darwin" {
+		http.Error(w, "restart is only available on macOS", http.StatusBadRequest)
+		return
+	}
+	_ = exec.Command("osascript", "-e", `tell application "Ollama" to quit`).Run()
+	time.Sleep(800 * time.Millisecond)
+	if err := exec.Command("open", "-a", "Ollama").Start(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+	writeJSON(w, map[string]interface{}{"ok": true, "action": "restart"})
+}
+
+func modelFromJSONRequest(w http.ResponseWriter, r *http.Request) (string, bool) {
+	var req struct {
+		Model string `json:"model"`
+		Name  string `json:"name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return "", false
+	}
+	model := strings.TrimSpace(req.Model)
+	if model == "" {
+		model = strings.TrimSpace(req.Name)
+	}
+	if model == "" {
+		http.Error(w, "expected JSON body: {\"model\":\"llama3.2\"}", http.StatusBadRequest)
+		return "", false
+	}
+	return model, true
+}
+
+func (s *Server) writeOllamaPerformance(w http.ResponseWriter, message string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	running, err := s.ollama.RunningModels(ctx)
+	errorText := ""
+	if err != nil {
+		errorText = err.Error()
+	}
+	writeJSON(w, map[string]interface{}{
+		"settings":          clampOllamaPerformance(s.config.Get().OllamaPerformance, performanceLimits()),
+		"applied":           currentOllamaEnvironment(),
+		"limits":            performanceLimits(),
+		"runningModels":     running,
+		"runningModelError": errorText,
+		"restartRequired":   true,
+		"message":           message,
+	})
 }
 
 func (s *Server) cliConfigExportOptions(w http.ResponseWriter, r *http.Request) {
@@ -429,7 +555,7 @@ func (s *Server) chatCompletions(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	w.WriteHeader(resp.StatusCode)
-	_, copyErr := io.Copy(w, resp.Body)
+	copyErr := copyAndFlush(w, resp.Body)
 	errText := ""
 	if copyErr != nil {
 		errText = copyErr.Error()
@@ -450,6 +576,167 @@ func (s *Server) cleanupUsageLoop() {
 			s.store.Publish("usage_auto_deleted", map[string]int{"count": removed})
 		}
 	}
+}
+
+func copyAndFlush(w http.ResponseWriter, r io.Reader) error {
+	flusher, _ := w.(http.Flusher)
+	buf := make([]byte, 32*1024)
+	for {
+		n, err := r.Read(buf)
+		if n > 0 {
+			if _, writeErr := w.Write(buf[:n]); writeErr != nil {
+				return writeErr
+			}
+			if flusher != nil {
+				flusher.Flush()
+			}
+		}
+		if err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return err
+		}
+	}
+}
+
+type ollamaPerformanceLimits struct {
+	NumParallelMax     int   `json:"numParallelMax"`
+	MaxLoadedModelsMax int   `json:"maxLoadedModelsMax"`
+	MaxQueueMax        int   `json:"maxQueueMax"`
+	ContextLengthMax   int   `json:"contextLengthMax"`
+	CPUThreadsMax      int   `json:"cpuThreadsMax"`
+	LogicalCPU         int   `json:"logicalCpu"`
+	MemoryBytes        int64 `json:"memoryBytes"`
+}
+
+func performanceLimits() ollamaPerformanceLimits {
+	mem := systemMemoryBytes()
+	memGB := int(mem / (1024 * 1024 * 1024))
+	if memGB <= 0 {
+		memGB = 8
+	}
+	cpus := runtime.NumCPU()
+	if cpus <= 0 {
+		cpus = 1
+	}
+	maxLoaded := memGB / 4
+	if maxLoaded < 1 {
+		maxLoaded = 1
+	}
+	if maxLoaded > 8 {
+		maxLoaded = 8
+	}
+	contextMax := 4096 * memGB
+	if contextMax < 4096 {
+		contextMax = 4096
+	}
+	if contextMax > 131072 {
+		contextMax = 131072
+	}
+	return ollamaPerformanceLimits{
+		NumParallelMax:     cpus,
+		MaxLoadedModelsMax: maxLoaded,
+		MaxQueueMax:        2048,
+		ContextLengthMax:   contextMax,
+		CPUThreadsMax:      cpus,
+		LogicalCPU:         cpus,
+		MemoryBytes:        mem,
+	}
+}
+
+func clampOllamaPerformance(cfg settings.OllamaPerformance, limits ollamaPerformanceLimits) settings.OllamaPerformance {
+	cfg.NumParallel = clampInt(cfg.NumParallel, 1, limits.NumParallelMax)
+	cfg.MaxLoadedModels = clampInt(cfg.MaxLoadedModels, 1, limits.MaxLoadedModelsMax)
+	cfg.MaxQueue = clampInt(cfg.MaxQueue, 1, limits.MaxQueueMax)
+	cfg.ContextLength = clampInt(cfg.ContextLength, 1024, limits.ContextLengthMax)
+	cfg.CPUThreads = clampInt(cfg.CPUThreads, 1, limits.CPUThreadsMax)
+	cfg.ContextLength = (cfg.ContextLength / 1024) * 1024
+	if cfg.ContextLength < 1024 {
+		cfg.ContextLength = 1024
+	}
+	cfg.KeepAlive = strings.TrimSpace(cfg.KeepAlive)
+	if cfg.KeepAlive == "" {
+		cfg.KeepAlive = "5m"
+	}
+	switch cfg.KVCacheType {
+	case "f16", "q8_0", "q4_0":
+	default:
+		cfg.KVCacheType = "f16"
+	}
+	return cfg
+}
+
+func clampInt(value, min, max int) int {
+	if max < min {
+		max = min
+	}
+	if value < min {
+		return min
+	}
+	if value > max {
+		return max
+	}
+	return value
+}
+
+func systemMemoryBytes() int64 {
+	if runtime.GOOS != "darwin" {
+		return 0
+	}
+	out, err := exec.Command("sysctl", "-n", "hw.memsize").Output()
+	if err != nil {
+		return 0
+	}
+	value, err := strconv.ParseInt(strings.TrimSpace(string(out)), 10, 64)
+	if err != nil {
+		return 0
+	}
+	return value
+}
+
+func applyOllamaEnvironment(cfg settings.OllamaPerformance) error {
+	values := map[string]string{
+		"OLLAMA_NUM_PARALLEL":      strconv.Itoa(cfg.NumParallel),
+		"OLLAMA_MAX_LOADED_MODELS": strconv.Itoa(cfg.MaxLoadedModels),
+		"OLLAMA_MAX_QUEUE":         strconv.Itoa(cfg.MaxQueue),
+		"OLLAMA_CONTEXT_LENGTH":    strconv.Itoa(cfg.ContextLength),
+		"OLLAMA_NUM_THREADS":       strconv.Itoa(cfg.CPUThreads),
+		"OLLAMA_KEEP_ALIVE":        cfg.KeepAlive,
+		"OLLAMA_FLASH_ATTENTION":   boolEnv(cfg.FlashAttention),
+		"OLLAMA_KV_CACHE_TYPE":     cfg.KVCacheType,
+	}
+	for key, value := range values {
+		if runtime.GOOS == "darwin" {
+			if err := exec.Command("launchctl", "setenv", key, value).Run(); err != nil {
+				return fmt.Errorf("launchctl setenv %s failed: %w", key, err)
+			}
+		}
+		_ = os.Setenv(key, value)
+	}
+	return nil
+}
+
+func currentOllamaEnvironment() map[string]string {
+	keys := []string{"OLLAMA_NUM_PARALLEL", "OLLAMA_MAX_LOADED_MODELS", "OLLAMA_MAX_QUEUE", "OLLAMA_CONTEXT_LENGTH", "OLLAMA_NUM_THREADS", "OLLAMA_KEEP_ALIVE", "OLLAMA_FLASH_ATTENTION", "OLLAMA_KV_CACHE_TYPE"}
+	values := make(map[string]string, len(keys))
+	for _, key := range keys {
+		value := os.Getenv(key)
+		if runtime.GOOS == "darwin" {
+			if out, err := exec.Command("launchctl", "getenv", key).Output(); err == nil && strings.TrimSpace(string(out)) != "" {
+				value = strings.TrimSpace(string(out))
+			}
+		}
+		values[key] = value
+	}
+	return values
+}
+
+func boolEnv(value bool) string {
+	if value {
+		return "1"
+	}
+	return "0"
 }
 
 func writeJSON(w http.ResponseWriter, data interface{}) {
