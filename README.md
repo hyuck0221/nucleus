@@ -117,6 +117,21 @@ curl http://127.0.0.1:8787/v1/images/generations \
   }'
 ```
 
+For long image generations, avoid client or proxy timeouts by requesting an async job:
+
+```bash
+curl 'http://127.0.0.1:8787/v1/images/generations?async=true' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "model": "x/z-image-turbo",
+    "prompt": "A detailed architectural concept render",
+    "size": "1024x1024",
+    "response_format": "b64_json"
+  }'
+```
+
+The response includes a `url` such as `/api/images/generations/{id}`. Poll that URL until `status` is `done` or `error`.
+
 The dashboard records:
 
 - user name from `X-Nucleus-User`, `X-User`, or `X-Forwarded-User`

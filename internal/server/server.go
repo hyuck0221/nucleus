@@ -17,6 +17,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/shimhyuck/nucleus/internal/huggingface"
@@ -37,10 +38,13 @@ type Server struct {
 	update *updater.Client
 	store  *store.Store
 	logger *slog.Logger
+
+	imageJobsMu sync.RWMutex
+	imageJobs   map[string]imageGenerationJob
 }
 
 func New(ollamaClient *ollama.Client, usage *store.Store, logger *slog.Logger) *Server {
-	srv := &Server{ollama: ollamaClient, hf: huggingface.New(), config: settings.New(), update: updater.New(), store: usage, logger: logger}
+	srv := &Server{ollama: ollamaClient, hf: huggingface.New(), config: settings.New(), update: updater.New(), store: usage, logger: logger, imageJobs: make(map[string]imageGenerationJob)}
 	go srv.cleanupUsageLoop()
 	return srv
 }
@@ -72,6 +76,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/usage/delete", s.deleteUsage)
 	mux.HandleFunc("/api/usage/clear", s.clearUsage)
 	mux.HandleFunc("/api/requests/stop", s.stopRequest)
+	mux.HandleFunc("/api/images/generations", s.startImageGeneration)
+	mux.HandleFunc("/api/images/generations/", s.imageGenerationJob)
 	mux.HandleFunc("/api/events", s.events)
 	mux.HandleFunc("/v1/models", s.openAIModels)
 	mux.HandleFunc("/v1/chat/completions", s.chatCompletions)
@@ -498,6 +504,42 @@ func (s *Server) stopRequest(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]bool{"stopped": s.store.Stop(req.ID)})
 }
 
+func (s *Server) startImageGeneration(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	job := s.startImageGenerationJob(r, body)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusAccepted)
+	writeJSON(w, job)
+}
+
+func (s *Server) imageGenerationJob(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	id := strings.TrimPrefix(r.URL.Path, "/api/images/generations/")
+	if id == "" || strings.Contains(id, "/") {
+		http.NotFound(w, r)
+		return
+	}
+	s.imageJobsMu.RLock()
+	job, ok := s.imageJobs[id]
+	s.imageJobsMu.RUnlock()
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	writeJSON(w, job)
+}
+
 func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -590,6 +632,13 @@ func (s *Server) imageGenerations(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	if wantsAsyncImageGeneration(r) {
+		job := s.startImageGenerationJob(r, body)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusAccepted)
+		writeJSON(w, job)
+		return
+	}
 	model := modelFromBody(body)
 	id := randomID()
 	record := store.RequestRecord{
@@ -622,6 +671,96 @@ func (s *Server) imageGenerations(w http.ResponseWriter, r *http.Request) {
 		errText = copyErr.Error()
 	}
 	s.store.Finish(id, resp.StatusCode, errText)
+}
+
+type imageGenerationJob struct {
+	ID         string          `json:"id"`
+	Status     string          `json:"status"`
+	Model      string          `json:"model"`
+	Error      string          `json:"error,omitempty"`
+	StatusCode int             `json:"statusCode,omitempty"`
+	Response   json.RawMessage `json:"response,omitempty"`
+	URL        string          `json:"url"`
+	StartedAt  time.Time       `json:"startedAt"`
+	FinishedAt *time.Time      `json:"finishedAt,omitempty"`
+}
+
+func (s *Server) startImageGenerationJob(r *http.Request, body []byte) imageGenerationJob {
+	id := randomID()
+	model := modelFromBody(body)
+	job := imageGenerationJob{
+		ID:        id,
+		Status:    "running",
+		Model:     model,
+		URL:       "/api/images/generations/" + id,
+		StartedAt: time.Now(),
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	record := store.RequestRecord{
+		ID:        id,
+		User:      userFromRequest(r),
+		Client:    clientFromRequest(r),
+		Model:     model,
+		Path:      "/v1/images/generations",
+		StartedAt: job.StartedAt,
+	}
+	s.imageJobsMu.Lock()
+	s.imageJobs[id] = job
+	s.imageJobsMu.Unlock()
+	s.store.Start(record, cancel)
+	go s.runImageGenerationJob(ctx, cancel, id, body)
+	return job
+}
+
+func (s *Server) runImageGenerationJob(ctx context.Context, cancel context.CancelFunc, id string, body []byte) {
+	defer cancel()
+	resp, err := s.ollama.ProxyOpenAIImages(ctx, strings.NewReader(string(body)))
+	statusCode := http.StatusOK
+	errText := ""
+	var payload []byte
+	if err != nil {
+		statusCode = http.StatusBadGateway
+		errText = err.Error()
+	} else {
+		defer resp.Body.Close()
+		statusCode = resp.StatusCode
+		payload, err = io.ReadAll(resp.Body)
+		if err != nil {
+			errText = err.Error()
+			if statusCode < 400 {
+				statusCode = http.StatusBadGateway
+			}
+		}
+		if statusCode >= 400 && errText == "" {
+			errText = strings.TrimSpace(string(payload))
+			if errText == "" {
+				errText = resp.Status
+			}
+		}
+	}
+
+	s.imageJobsMu.Lock()
+	job := s.imageJobs[id]
+	job.StatusCode = statusCode
+	finishedAt := time.Now()
+	job.FinishedAt = &finishedAt
+	if errText != "" || statusCode >= 400 {
+		job.Status = "error"
+		job.Error = errText
+	} else {
+		job.Status = "done"
+		job.Response = json.RawMessage(payload)
+	}
+	s.imageJobs[id] = job
+	s.imageJobsMu.Unlock()
+	s.store.Finish(id, statusCode, errText)
+}
+
+func wantsAsyncImageGeneration(r *http.Request) bool {
+	if strings.EqualFold(r.URL.Query().Get("async"), "true") || r.URL.Query().Get("async") == "1" {
+		return true
+	}
+	return strings.Contains(strings.ToLower(r.Header.Get("Prefer")), "respond-async")
 }
 
 func (s *Server) cleanupUsageLoop() {

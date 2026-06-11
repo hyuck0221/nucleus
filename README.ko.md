@@ -117,6 +117,21 @@ curl http://127.0.0.1:8787/v1/images/generations \
   }'
 ```
 
+이미지 생성이 오래 걸릴 때는 클라이언트나 프록시 timeout을 피하기 위해 async job으로 요청할 수 있습니다.
+
+```bash
+curl 'http://127.0.0.1:8787/v1/images/generations?async=true' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "model": "x/z-image-turbo",
+    "prompt": "A detailed architectural concept render",
+    "size": "1024x1024",
+    "response_format": "b64_json"
+  }'
+```
+
+응답에는 `/api/images/generations/{id}` 형태의 `url`이 포함됩니다. 해당 URL을 `status`가 `done` 또는 `error`가 될 때까지 조회하면 됩니다.
+
 대시보드는 다음 헤더를 읽어 호출 정보를 표시합니다.
 
 - 사용자: `X-Nucleus-User`, `X-User`, `X-Forwarded-User`

@@ -656,6 +656,7 @@
     let chatBusy = false;
     let imageModels = [];
     let imageBusy = false;
+    let imageJobTimer = null;
     let performanceState = null;
     const modelPageSize = 5;
     const usagePageSize = 50;
@@ -956,7 +957,7 @@
       if (quality) payload.quality = quality;
       if (style) payload.style = style;
       try {
-        const response = await fetch('/v1/images/generations', {
+        const response = await fetch('/api/images/generations', {
           method:'POST',
           headers:{'Content-Type':'application/json'},
           body:JSON.stringify(payload)
@@ -965,9 +966,9 @@
           const text = await response.text();
           throw new Error(text || `Request failed with ${response.status}`);
         }
-        const data = await response.json();
-        renderGeneratedImages(data.data || []);
-        $('imageStatus').textContent = `Generated ${data.data?.length || 0} image${(data.data?.length || 0) === 1 ? '' : 's'} with ${model}.`;
+        const job = await response.json();
+        $('imageStatus').textContent = `Generating with ${model}...`;
+        await pollImageJob(job.url);
       } catch (error) {
         $('imageResults').innerHTML = `<div class="image-empty">${escapeHTML(error.message)}</div>`;
         $('imageStatus').textContent = 'Image generation failed.';
@@ -977,6 +978,30 @@
         renderImageGuide();
         refresh();
         loadPerformance();
+      }
+    }
+
+    async function pollImageJob(url) {
+      if (!url) throw new Error('Image generation job did not return a status URL.');
+      clearTimeout(imageJobTimer);
+      while (true) {
+        const job = await fetch(url).then((response) => {
+          if (!response.ok) return response.text().then((text) => { throw new Error(text || `Job lookup failed with ${response.status}`); });
+          return response.json();
+        });
+        if (job.status === 'done') {
+          const data = job.response || {};
+          renderGeneratedImages(data.data || []);
+          $('imageStatus').textContent = `Generated ${data.data?.length || 0} image${(data.data?.length || 0) === 1 ? '' : 's'} with ${job.model || $('imageModel').value}.`;
+          return;
+        }
+        if (job.status === 'error') {
+          throw new Error(job.error || `Image generation failed with ${job.statusCode || 'unknown status'}.`);
+        }
+        $('imageStatus').textContent = `Still generating with ${job.model || $('imageModel').value}...`;
+        await new Promise((resolve) => {
+          imageJobTimer = setTimeout(resolve, 2000);
+        });
       }
     }
 
