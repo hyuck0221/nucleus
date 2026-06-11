@@ -111,6 +111,7 @@ Usage:
 API:
   Dashboard:              http://127.0.0.1:8787
   OpenAI compatible chat: POST /v1/chat/completions
+  OpenAI compatible image: POST /v1/images/generations
   OpenAI compatible list: GET  /v1/models
 
 Tailscale or LAN access:

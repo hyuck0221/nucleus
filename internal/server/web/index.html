@@ -116,6 +116,11 @@
     .progress-detail { color:var(--muted); font-size:12px; min-height:16px; }
     .panel-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:8px; }
     .panel-head .metric { margin-bottom:0; }
+    .playground-tabs { display:flex; gap:6px; flex-wrap:wrap; }
+    .playground-tab { background:#11161c; color:var(--muted); border:1px solid var(--line); padding:6px 10px; font-size:12px; }
+    .playground-tab.active { color:#071019; background:var(--accent); border-color:var(--accent); }
+    .playground-panel { display:none; }
+    .playground-panel.active { display:block; }
     .chat-layout { display:grid; grid-template-columns:minmax(0,1.4fr) minmax(280px,.8fr); gap:14px; align-items:stretch; }
     .chat-console { height:560px; min-height:0; display:grid; grid-template-rows:auto minmax(0,1fr) auto; gap:10px; }
     .chat-toolbar { display:grid; grid-template-columns:minmax(180px,1fr) auto; gap:8px; align-items:center; }
@@ -141,6 +146,17 @@
     .guide-card span, .guide-card li { color:var(--muted); font-size:12px; line-height:1.45; }
     .guide-card ul { margin:0; padding-left:18px; }
     .code-block { margin:0; padding:12px; border:1px solid var(--line); border-radius:8px; background:#0c0f12; color:#dce8f3; overflow:auto; user-select:text; -webkit-user-select:text; font-size:12px; line-height:1.45; white-space:pre-wrap; }
+    .image-layout { display:grid; grid-template-columns:minmax(300px,.82fr) minmax(0,1.18fr); gap:14px; align-items:start; }
+    .image-form { display:grid; gap:12px; }
+    .image-form label { display:grid; gap:6px; color:var(--muted); font-size:12px; font-weight:700; }
+    .image-form textarea { min-height:130px; }
+    .image-options { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+    .image-result-head { display:flex; justify-content:space-between; gap:12px; align-items:center; margin-bottom:10px; }
+    .image-results { min-height:420px; display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; align-content:start; }
+    .image-empty { color:var(--muted); font-size:13px; align-self:center; justify-self:center; text-align:center; }
+    .image-card { display:grid; gap:8px; border:1px solid var(--line); border-radius:8px; padding:10px; background:#12161b; }
+    .image-card img { width:100%; aspect-ratio:1; object-fit:contain; border:1px solid var(--line); border-radius:7px; background:#0c0f12; user-select:auto; -webkit-user-select:auto; }
+    .image-card a { color:var(--accent); font-size:12px; font-weight:700; text-decoration:none; }
     .perf-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
     .perf-field { display:grid; gap:6px; }
     .perf-field label { color:var(--muted); font-size:12px; font-weight:700; }
@@ -159,7 +175,7 @@
     th { color:var(--muted); font-weight:600; }
     .span2 { grid-column:span 2; }
     .span4 { grid-column:span 4; }
-    @media (max-width:900px) { .grid { grid-template-columns:1fr; } .span2,.span4 { grid-column:auto; } header { align-items:flex-start; gap:10px; flex-direction:column; } .top-tabs, .toolbar { width:100%; } .top-tab { flex:1; } .update-banner { top:156px; align-items:flex-start; flex-direction:column; } .update-actions, .update-progress { width:100%; } .toolbar, .download-row, .model-search, .tool-grid, .chat-layout, .chat-toolbar, .chat-form, .perf-grid { width:100%; grid-template-columns:1fr; } .panel-head { align-items:flex-start; flex-direction:column; } #openExportBtn, #openDownloadBtn, #pullBtn, #hfSearchBtn, #chatSendBtn { width:100%; } .hf-results { max-height:240px; } .hf-card { grid-template-columns:minmax(0,1fr) auto; } .chat-message { max-width:100%; } .chat-console { height:520px; } }
+    @media (max-width:900px) { .grid { grid-template-columns:1fr; } .span2,.span4 { grid-column:auto; } header { align-items:flex-start; gap:10px; flex-direction:column; } .top-tabs, .toolbar { width:100%; } .top-tab { flex:1; } .update-banner { top:156px; align-items:flex-start; flex-direction:column; } .update-actions, .update-progress { width:100%; } .toolbar, .download-row, .model-search, .tool-grid, .chat-layout, .chat-toolbar, .chat-form, .image-layout, .image-options, .perf-grid { width:100%; grid-template-columns:1fr; } .panel-head { align-items:flex-start; flex-direction:column; } #openExportBtn, #openDownloadBtn, #pullBtn, #hfSearchBtn, #chatSendBtn, #imageGenerateBtn { width:100%; } .hf-results { max-height:240px; } .hf-card { grid-template-columns:minmax(0,1fr) auto; } .chat-message { max-width:100%; } .chat-console { height:520px; } }
   </style>
 </head>
 <body>
@@ -475,39 +491,105 @@
         <div class="panel-head">
           <div>
             <div class="metric">API playground</div>
-            <div class="section-title">Session-only chat test</div>
+            <div class="section-title">Session-only local API tests</div>
           </div>
-          <button id="chatClearBtn" class="ghost-btn" type="button">Clear chat</button>
+          <div class="playground-tabs" role="tablist" aria-label="API playground">
+            <button class="playground-tab active" type="button" data-playground-tab="chat" aria-controls="chatPlayground">Chat</button>
+            <button class="playground-tab" type="button" data-playground-tab="image" aria-controls="imagePlayground">Image generation</button>
+          </div>
         </div>
-        <div class="chat-layout">
-          <div class="chat-console">
-            <div class="chat-toolbar">
-              <select id="chatModel" aria-label="Chat model"></select>
-              <div id="chatStatus" class="export-status">Loading installed models...</div>
+        <div id="chatPlayground" class="playground-panel active">
+          <div class="panel-head">
+            <div class="section-title">Chat completions</div>
+            <button id="chatClearBtn" class="ghost-btn" type="button">Clear chat</button>
+          </div>
+          <div class="chat-layout">
+            <div class="chat-console">
+              <div class="chat-toolbar">
+                <select id="chatModel" aria-label="Chat model"></select>
+                <div id="chatStatus" class="export-status">Loading installed models...</div>
+              </div>
+              <div id="chatLog" class="chat-log" aria-live="polite"></div>
+              <div class="chat-form">
+                <textarea id="chatInput" placeholder="Ask the selected local model..." aria-label="Chat message"></textarea>
+                <button id="chatSendBtn" type="button">Send</button>
+              </div>
             </div>
-            <div id="chatLog" class="chat-log" aria-live="polite"></div>
-            <div class="chat-form">
-              <textarea id="chatInput" placeholder="Ask the selected local model..." aria-label="Chat message"></textarea>
-              <button id="chatSendBtn" type="button">Send</button>
+            <div class="guide-panel">
+              <div class="guide-card">
+                <strong>How this test works</strong>
+                <ul>
+                  <li>The selector only shows models installed in Ollama.</li>
+                  <li>Messages stay in this browser session and are not persisted.</li>
+                  <li>Each send streams from the OpenAI-compatible chat endpoint.</li>
+                </ul>
+              </div>
+              <div class="guide-card">
+                <strong>Endpoint</strong>
+                <span id="apiEndpointText">POST /v1/chat/completions</span>
+              </div>
+              <div class="guide-card">
+                <strong>curl example</strong>
+                <pre id="apiCurlExample" class="code-block"></pre>
+                <button id="copyCurlBtn" class="ghost-btn" type="button">Copy curl</button>
+              </div>
             </div>
           </div>
-          <div class="guide-panel">
-            <div class="guide-card">
-              <strong>How this test works</strong>
-              <ul>
-                <li>The selector only shows models installed in Ollama.</li>
-                <li>Messages stay in this browser session and are not persisted.</li>
-                <li>Each send streams from the OpenAI-compatible chat endpoint.</li>
-              </ul>
+        </div>
+        <div id="imagePlayground" class="playground-panel">
+          <div class="image-layout">
+            <div class="image-form">
+              <label>
+                Model
+                <select id="imageModel" aria-label="Image generation model"></select>
+              </label>
+              <label>
+                Prompt
+                <textarea id="imagePrompt" placeholder="A cute robot learning to paint, studio lighting, high detail" aria-label="Image generation prompt"></textarea>
+              </label>
+              <div class="image-options">
+                <label>
+                  Size
+                  <select id="imageSize" aria-label="Image size">
+                    <option value="512x512">512x512</option>
+                    <option value="768x768">768x768</option>
+                    <option value="1024x1024" selected>1024x1024</option>
+                    <option value="1024x768">1024x768</option>
+                    <option value="768x1024">768x1024</option>
+                  </select>
+                </label>
+                <label>
+                  Images
+                  <input id="imageCount" type="number" min="1" max="4" step="1" value="1" aria-label="Number of images">
+                </label>
+                <label>
+                  Quality
+                  <select id="imageQuality" aria-label="Image quality">
+                    <option value="standard" selected>standard</option>
+                    <option value="hd">hd</option>
+                  </select>
+                </label>
+                <label>
+                  Style
+                  <select id="imageStyle" aria-label="Image style">
+                    <option value="">default</option>
+                    <option value="natural">natural</option>
+                    <option value="vivid">vivid</option>
+                  </select>
+                </label>
+              </div>
+              <button id="imageGenerateBtn" type="button" disabled>Generate</button>
+              <div id="imageStatus" class="export-status">Loading image generation models...</div>
             </div>
             <div class="guide-card">
-              <strong>Endpoint</strong>
-              <span id="apiEndpointText">POST /v1/chat/completions</span>
-            </div>
-            <div class="guide-card">
-              <strong>curl example</strong>
-              <pre id="apiCurlExample" class="code-block"></pre>
-              <button id="copyCurlBtn" class="ghost-btn" type="button">Copy curl</button>
+              <div class="image-result-head">
+                <strong>Generated images</strong>
+                <button id="copyImageCurlBtn" class="ghost-btn" type="button">Copy curl</button>
+              </div>
+              <div id="imageResults" class="image-results" aria-live="polite">
+                <div class="image-empty">Generate an image to preview it here.</div>
+              </div>
+              <pre id="imageCurlExample" class="code-block"></pre>
             </div>
           </div>
         </div>
@@ -572,6 +654,8 @@
     let usageTab = 'all';
     let chatMessages = [];
     let chatBusy = false;
+    let imageModels = [];
+    let imageBusy = false;
     let performanceState = null;
     const modelPageSize = 5;
     const usagePageSize = 50;
@@ -583,9 +667,10 @@
     };
 
     async function refresh() {
-      const [status, models] = await Promise.all([
+      const [status, models, images] = await Promise.all([
         fetch('/api/status').then(r => r.json()),
-        fetch('/api/models').then(r => r.ok ? r.json() : {models: []})
+        fetch('/api/models').then(r => r.ok ? r.json() : {models: []}),
+        fetch('/api/image-models').then(r => r.ok ? r.json() : {models: []})
       ]);
       $('ollama').textContent = status.ollama.reachable ? 'online' : (status.ollama.installed ? 'offline' : 'missing');
       $('ollama').className = `value ${status.ollama.reachable ? 'ok' : 'bad'}`;
@@ -593,8 +678,10 @@
       $('activeUsers').textContent = new Set(status.active.map(r => r.user)).size;
       $('recentModel').textContent = status.recent[0]?.model || 'none';
       cachedModels = models.models || [];
+      imageModels = images.models || [];
       recentRecords = status.recent || [];
       renderChatModels();
+      renderImageModels();
       renderModels();
       renderUsage();
       $('active').innerHTML = status.active.map(r => `<tr><td>${escapeHTML(r.user)}</td><td>${escapeHTML(r.model)}</td><td>${escapeHTML(r.client)}</td><td>${fmtTime(r.startedAt)}</td><td class="actions"><button class="danger-btn" type="button" data-stop-request="${escapeHTML(r.id)}">Stop</button></td></tr>`).join('') || '<tr><td colspan="5">No active requests</td></tr>';
@@ -661,6 +748,18 @@
       renderApiGuide();
     }
 
+    function renderImageModels() {
+      const selected = $('imageModel').value;
+      $('imageModel').innerHTML = imageModels.map((model) => `<option value="${escapeHTML(model.name)}">${escapeHTML(model.name)}</option>`).join('');
+      if (imageModels.some((model) => model.name === selected)) {
+        $('imageModel').value = selected;
+      }
+      const current = $('imageModel').value || imageModels[0]?.name || '';
+      $('imageStatus').textContent = current ? `${imageModels.length} image generation models available.` : 'No image generation models installed. Download x/z-image-turbo or x/flux2-klein first.';
+      $('imageGenerateBtn').disabled = imageBusy || !current;
+      renderImageGuide();
+    }
+
     function renderChat() {
       if (!chatMessages.length) {
         $('chatLog').innerHTML = '<div class="chat-empty">Send a message to test the local API.</div>';
@@ -713,6 +812,45 @@
   }'`;
     }
 
+    function renderImageGuide() {
+      const origin = window.location.origin;
+      const model = $('imageModel').value || imageModels[0]?.name || 'x/z-image-turbo';
+      const prompt = $('imagePrompt').value.trim() || 'A cute robot learning to paint';
+      const payload = {
+        model,
+        prompt,
+        size: $('imageSize').value || '1024x1024',
+        response_format: 'b64_json',
+        n: Math.min(4, Math.max(1, Number($('imageCount').value || 1)))
+      };
+      const quality = $('imageQuality').value;
+      const style = $('imageStyle').value;
+      if (quality) payload.quality = quality;
+      if (style) payload.style = style;
+      $('imageCurlExample').textContent = `curl ${origin}/v1/images/generations \\
+  -H "Content-Type: application/json" \\
+  -d ${shellQuote(JSON.stringify(payload, null, 2))}`;
+    }
+
+    function shellQuote(value) {
+      return "'" + String(value).replace(/'/g, "'\\''") + "'";
+    }
+
+    function renderGeneratedImages(items) {
+      const images = (items || []).map((item, index) => {
+        const b64 = item.b64_json || item.b64Json || '';
+        const url = item.url || (b64 ? `data:image/png;base64,${b64}` : '');
+        if (!url) return '';
+        return `
+          <div class="image-card">
+            <img src="${escapeHTML(url)}" alt="Generated image ${index + 1}">
+            <a href="${escapeHTML(url)}" download="nucleus-image-${index + 1}.png">Download PNG</a>
+          </div>
+        `;
+      }).filter(Boolean);
+      $('imageResults').innerHTML = images.join('') || '<div class="image-empty">No image data was returned.</div>';
+    }
+
     function selectView(view) {
       const next = view === 'api' ? 'api' : 'dashboard';
       $('dashboardView').classList.toggle('active', next === 'dashboard');
@@ -725,6 +863,19 @@
       window.location.hash = next === 'api' ? 'api' : '';
       if (next === 'api') renderApiGuide();
       if (next === 'api') loadPerformance();
+    }
+
+    function selectPlayground(tab) {
+      const next = tab === 'image' ? 'image' : 'chat';
+      $('chatPlayground').classList.toggle('active', next === 'chat');
+      $('imagePlayground').classList.toggle('active', next === 'image');
+      document.querySelectorAll('[data-playground-tab]').forEach((button) => {
+        const active = button.dataset.playgroundTab === next;
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-selected', String(active));
+      });
+      if (next === 'chat') renderApiGuide();
+      if (next === 'image') renderImageGuide();
     }
 
     async function sendChatMessage() {
@@ -780,6 +931,50 @@
         chatBusy = false;
         $('chatSendBtn').disabled = !$('chatModel').value;
         renderChat();
+        refresh();
+        loadPerformance();
+      }
+    }
+
+    async function generateImage() {
+      const model = $('imageModel').value;
+      const prompt = $('imagePrompt').value.trim();
+      if (!model || !prompt || imageBusy) return;
+      imageBusy = true;
+      $('imageGenerateBtn').disabled = true;
+      $('imageStatus').textContent = `Generating with ${model}...`;
+      $('imageResults').innerHTML = '<div class="image-empty">Generating image...</div>';
+      const payload = {
+        model,
+        prompt,
+        size: $('imageSize').value || '1024x1024',
+        response_format: 'b64_json',
+        n: Math.min(4, Math.max(1, Number($('imageCount').value || 1)))
+      };
+      const quality = $('imageQuality').value;
+      const style = $('imageStyle').value;
+      if (quality) payload.quality = quality;
+      if (style) payload.style = style;
+      try {
+        const response = await fetch('/v1/images/generations', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify(payload)
+        });
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(text || `Request failed with ${response.status}`);
+        }
+        const data = await response.json();
+        renderGeneratedImages(data.data || []);
+        $('imageStatus').textContent = `Generated ${data.data?.length || 0} image${(data.data?.length || 0) === 1 ? '' : 's'} with ${model}.`;
+      } catch (error) {
+        $('imageResults').innerHTML = `<div class="image-empty">${escapeHTML(error.message)}</div>`;
+        $('imageStatus').textContent = 'Image generation failed.';
+      } finally {
+        imageBusy = false;
+        $('imageGenerateBtn').disabled = !$('imageModel').value;
+        renderImageGuide();
         refresh();
         loadPerformance();
       }
@@ -1144,6 +1339,9 @@
     document.querySelectorAll('[data-view-tab]').forEach((button) => {
       button.onclick = () => selectView(button.dataset.viewTab);
     });
+    document.querySelectorAll('[data-playground-tab]').forEach((button) => {
+      button.onclick = () => selectPlayground(button.dataset.playgroundTab);
+    });
     $('chatSendBtn').onclick = sendChatMessage;
     $('chatClearBtn').onclick = () => {
       chatMessages = [];
@@ -1164,6 +1362,18 @@
       await copyText($('apiCurlExample').textContent);
       showToast('Copied curl example');
     };
+    $('imageGenerateBtn').onclick = generateImage;
+    $('imageModel').addEventListener('change', () => {
+      $('imageStatus').textContent = `Selected ${$('imageModel').value}.`;
+      renderImageGuide();
+    });
+    ['imagePrompt', 'imageSize', 'imageCount', 'imageQuality', 'imageStyle'].forEach((id) => {
+      $(id).addEventListener(id === 'imagePrompt' ? 'input' : 'change', renderImageGuide);
+    });
+    $('copyImageCurlBtn').onclick = async () => {
+      await copyText($('imageCurlExample').textContent);
+      showToast('Copied image curl example');
+    };
     $('savePerformanceBtn').onclick = savePerformance;
     $('refreshPerformanceBtn').onclick = loadPerformance;
     $('preloadModelBtn').onclick = () => controlOllama('preload');
@@ -1175,6 +1385,7 @@
     });
     renderChat();
     renderApiGuide();
+    renderImageGuide();
     selectView(window.location.hash.replace('#', '') === 'api' ? 'api' : 'dashboard');
 
     $('pullBtn').onclick = () => {

@@ -75,7 +75,7 @@ http://127.0.0.1:8787
 
 ## 3. API 호출
 
-Nucleus는 OpenAI 호환 채팅 API를 제공합니다.
+Nucleus는 OpenAI 호환 채팅 및 이미지 생성 API를 제공합니다.
 
 ```bash
 curl http://127.0.0.1:8787/v1/chat/completions \
@@ -94,6 +94,7 @@ curl http://127.0.0.1:8787/v1/chat/completions \
 
 - `GET /v1/models`
 - `POST /v1/chat/completions`
+- `POST /v1/images/generations`
 
 실시간 스트리밍 응답이 필요하면 요청 본문에 아래 값을 추가합니다.
 
@@ -101,6 +102,19 @@ curl http://127.0.0.1:8787/v1/chat/completions \
 {
   "stream": true
 }
+```
+
+이미지 생성은 `x/z-image-turbo`, `x/flux2-klein`처럼 로컬 Ollama에 설치된 이미지 생성 모델을 사용합니다.
+
+```bash
+curl http://127.0.0.1:8787/v1/images/generations \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "model": "x/z-image-turbo",
+    "prompt": "A cute robot learning to paint",
+    "size": "1024x1024",
+    "response_format": "b64_json"
+  }'
 ```
 
 대시보드는 다음 헤더를 읽어 호출 정보를 표시합니다.

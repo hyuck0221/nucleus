@@ -196,3 +196,9 @@ func (c *Client) ProxyOpenAI(ctx context.Context, body io.Reader) (*http.Respons
 	req.Header.Set("Content-Type", "application/json")
 	return c.HTTPClient.Do(req)
 }
+
+func (c *Client) ProxyOpenAIImages(ctx context.Context, body io.Reader) (*http.Response, error) {
+	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, c.BaseURL+"/v1/images/generations", body)
+	req.Header.Set("Content-Type", "application/json")
+	return c.HTTPClient.Do(req)
+}

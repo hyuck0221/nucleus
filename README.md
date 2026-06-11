@@ -75,7 +75,7 @@ By default, the server listens on `0.0.0.0:8787`, so LAN and Tailscale access ca
 
 ## 3. Call the API
 
-Nucleus exposes an OpenAI-compatible chat endpoint:
+Nucleus exposes OpenAI-compatible chat and image generation endpoints:
 
 ```bash
 curl http://127.0.0.1:8787/v1/chat/completions \
@@ -94,6 +94,7 @@ Useful endpoints:
 
 - `GET /v1/models`
 - `POST /v1/chat/completions`
+- `POST /v1/images/generations`
 
 For live token streaming, send:
 
@@ -101,6 +102,19 @@ For live token streaming, send:
 {
   "stream": true
 }
+```
+
+Image generation uses Ollama image generation models installed locally, such as `x/z-image-turbo` or `x/flux2-klein`:
+
+```bash
+curl http://127.0.0.1:8787/v1/images/generations \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "model": "x/z-image-turbo",
+    "prompt": "A cute robot learning to paint",
+    "size": "1024x1024",
+    "response_format": "b64_json"
+  }'
 ```
 
 The dashboard records:

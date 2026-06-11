@@ -53,6 +53,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/favicon.ico", s.favicon)
 	mux.HandleFunc("/api/status", s.status)
 	mux.HandleFunc("/api/models", s.models)
+	mux.HandleFunc("/api/image-models", s.imageModels)
 	mux.HandleFunc("/api/model-suggestions", s.modelSuggestions)
 	mux.HandleFunc("/api/models/pull", s.pull)
 	mux.HandleFunc("/api/models/delete", s.deleteModel)
@@ -74,6 +75,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/events", s.events)
 	mux.HandleFunc("/v1/models", s.openAIModels)
 	mux.HandleFunc("/v1/chat/completions", s.chatCompletions)
+	mux.HandleFunc("/v1/images/generations", s.imageGenerations)
 	return requestLogger(mux, s.logger)
 }
 
@@ -128,6 +130,21 @@ func (s *Server) modelSuggestions(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]interface{}{
 		"suggestions": suggestModels(r.URL.Query().Get("q"), models, 10),
 	})
+}
+
+func (s *Server) imageModels(w http.ResponseWriter, r *http.Request) {
+	models, err := s.ollama.Models(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+	imageModels := make([]ollama.Model, 0, len(models))
+	for _, model := range models {
+		if isImageGenerationModel(model.Name) {
+			imageModels = append(imageModels, model)
+		}
+	}
+	writeJSON(w, map[string]interface{}{"models": imageModels})
 }
 
 func (s *Server) pull(w http.ResponseWriter, r *http.Request) {
@@ -563,6 +580,50 @@ func (s *Server) chatCompletions(w http.ResponseWriter, r *http.Request) {
 	s.store.Finish(id, resp.StatusCode, errText)
 }
 
+func (s *Server) imageGenerations(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	model := modelFromBody(body)
+	id := randomID()
+	record := store.RequestRecord{
+		ID:        id,
+		User:      userFromRequest(r),
+		Client:    clientFromRequest(r),
+		Model:     model,
+		Path:      r.URL.Path,
+		StartedAt: time.Now(),
+	}
+	ctx, cancel := context.WithCancel(r.Context())
+	defer cancel()
+	s.store.Start(record, cancel)
+	resp, err := s.ollama.ProxyOpenAIImages(ctx, strings.NewReader(string(body)))
+	if err != nil {
+		s.store.Finish(id, http.StatusBadGateway, err.Error())
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+	defer resp.Body.Close()
+	for key, values := range resp.Header {
+		for _, value := range values {
+			w.Header().Add(key, value)
+		}
+	}
+	w.WriteHeader(resp.StatusCode)
+	copyErr := copyAndFlush(w, resp.Body)
+	errText := ""
+	if copyErr != nil {
+		errText = copyErr.Error()
+	}
+	s.store.Finish(id, resp.StatusCode, errText)
+}
+
 func (s *Server) cleanupUsageLoop() {
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
@@ -953,6 +1014,28 @@ var catalogModels = []modelSuggestion{
 	{Name: "codellama", Description: "Code generation model"},
 	{Name: "nomic-embed-text", Description: "Embedding model"},
 	{Name: "llava", Description: "Vision-language model"},
+	{Name: "x/z-image-turbo", Description: "Image generation model"},
+	{Name: "x/flux2-klein", Description: "Image generation model"},
+}
+
+func isImageGenerationModel(name string) bool {
+	value := strings.ToLower(strings.TrimSpace(name))
+	if value == "" {
+		return false
+	}
+	if value == "x/z-image-turbo" || strings.HasPrefix(value, "x/z-image-turbo:") {
+		return true
+	}
+	if value == "x/flux2-klein" || strings.HasPrefix(value, "x/flux2-klein:") {
+		return true
+	}
+	imageHints := []string{"z-image", "flux2-klein", "text-to-image", "image-generation"}
+	for _, hint := range imageHints {
+		if strings.Contains(value, hint) {
+			return true
+		}
+	}
+	return false
 }
 
 func suggestModels(query string, installed []ollama.Model, limit int) []modelSuggestion {
