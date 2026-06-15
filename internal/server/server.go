@@ -82,7 +82,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/v1/models", s.openAIModels)
 	mux.HandleFunc("/v1/chat/completions", s.chatCompletions)
 	mux.HandleFunc("/v1/images/generations", s.imageGenerations)
-	return requestLogger(mux, s.logger)
+	return requestLogger(corsMiddleware(mux), s.logger)
 }
 
 func (s *Server) dashboard(w http.ResponseWriter, r *http.Request) {
@@ -1130,6 +1130,30 @@ func requestLogger(next http.Handler, logger *slog.Logger) http.Handler {
 		next.ServeHTTP(w, r)
 		logger.Info("request", "method", r.Method, "path", r.URL.Path, "duration", time.Since(start))
 	})
+}
+
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		headers := w.Header()
+		headers.Set("Access-Control-Allow-Origin", "*")
+		headers.Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+		headers.Set("Access-Control-Allow-Headers", corsAllowedHeaders(r))
+		headers.Set("Access-Control-Expose-Headers", "Content-Type, Content-Length")
+		headers.Set("Access-Control-Max-Age", "86400")
+		headers.Set("Access-Control-Allow-Private-Network", "true")
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func corsAllowedHeaders(r *http.Request) string {
+	if requested := strings.TrimSpace(r.Header.Get("Access-Control-Request-Headers")); requested != "" {
+		return requested
+	}
+	return "Authorization, Content-Type, Accept, Origin, X-Requested-With, X-Nucleus-User, X-Nucleus-Client, X-User, X-Forwarded-User, Prefer"
 }
 
 type modelSuggestion struct {
