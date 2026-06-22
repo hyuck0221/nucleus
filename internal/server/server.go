@@ -479,6 +479,8 @@ func (s *Server) cliConfigExportDownload(w http.ResponseWriter, r *http.Request)
 func (s *Server) updateCheck(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
+	w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate")
+	w.Header().Set("Pragma", "no-cache")
 	writeJSON(w, s.update.Check(ctx, version.Version))
 }
 

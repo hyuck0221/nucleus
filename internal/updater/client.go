@@ -73,12 +73,20 @@ func (c *Client) Check(ctx context.Context, current string) CheckResult {
 	}
 	result.Latest = latest.TagName
 	result.PageURL = latest.HTMLURL
+	if strings.TrimSpace(latest.TagName) == "" {
+		result.Error = "github returned a release without a tag"
+		return result
+	}
 	chosen := selectDMG(latest.Assets)
 	if chosen.Name != "" {
 		result.AssetName = chosen.Name
 		result.AssetURL = chosen.BrowserDownloadURL
 	}
-	result.Available = newer(latest.TagName, current) && chosen.BrowserDownloadURL != ""
+	if newer(latest.TagName, current) && chosen.BrowserDownloadURL == "" {
+		result.Error = fmt.Sprintf("release %s has no compatible DMG asset", latest.TagName)
+		return result
+	}
+	result.Available = newer(latest.TagName, current)
 	return result
 }
 
@@ -103,8 +111,12 @@ func (c *Client) State() DownloadState {
 }
 
 func (c *Client) latestRelease(ctx context.Context) (release, error) {
-	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.github.com/repos/"+repo+"/releases/latest", nil)
+	url := fmt.Sprintf("https://api.github.com/repos/%s/releases/latest?nocache=%d", repo, time.Now().UnixNano())
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("Cache-Control", "no-cache")
+	req.Header.Set("Pragma", "no-cache")
+	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
 	req.Header.Set("User-Agent", "nucleus-updater")
 	resp, err := c.HTTPClient.Do(req)
 	if err != nil {

@@ -1611,9 +1611,15 @@
       if (manual) {
         $('manualUpdateStatus').textContent = 'Checking GitHub releases...';
       }
-      const info = await fetch('/api/update/check').then(r => r.json()).catch(() => null);
+      const info = await fetch('/api/update/check', {cache:'no-store'}).then(r => r.json()).catch(() => null);
       if (!info) {
         if (manual) $('manualUpdateStatus').textContent = 'Update check failed.';
+        return;
+      }
+      if (info.error) {
+        availableUpdate = null;
+        $('settingsUpdateBtn').style.display = 'none';
+        if (manual) $('manualUpdateStatus').textContent = `Update check failed: ${info.error}`;
         return;
       }
       availableUpdate = info.available ? info : null;
