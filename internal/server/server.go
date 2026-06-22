@@ -144,10 +144,9 @@ func (s *Server) chatModels(w http.ResponseWriter, r *http.Request) {
 		data = append(data, map[string]interface{}{"name": model.Name, "provider": "ollama"})
 	}
 	if status := s.antigravity.Status(r.Context()); status.Installed {
-		data = append(data, map[string]interface{}{"name": antigravity.ModelID, "provider": "antigravity-cli", "version": status.Version})
 		if cliModels, err := s.antigravity.Models(r.Context()); err == nil {
 			for _, model := range cliModels {
-				data = append(data, map[string]interface{}{"name": antigravity.ModelID + "/" + model, "provider": "antigravity-cli", "version": status.Version})
+				data = append(data, map[string]interface{}{"name": model.ID, "displayName": model.Name, "provider": "antigravity-cli", "version": status.Version})
 			}
 		}
 	}
@@ -615,10 +614,9 @@ func (s *Server) openAIModels(w http.ResponseWriter, r *http.Request) {
 		data = append(data, map[string]interface{}{"id": model.Name, "object": "model", "owned_by": "local-ollama"})
 	}
 	if antigravityStatus.Installed {
-		data = append(data, map[string]interface{}{"id": antigravity.ModelID, "object": "model", "owned_by": "local-antigravity-cli"})
 		if cliModels, modelsErr := s.antigravity.Models(r.Context()); modelsErr == nil {
 			for _, model := range cliModels {
-				data = append(data, map[string]interface{}{"id": antigravity.ModelID + "/" + model, "object": "model", "owned_by": "local-antigravity-cli"})
+				data = append(data, map[string]interface{}{"id": model.ID, "object": "model", "owned_by": "local-antigravity-cli", "name": model.Name})
 			}
 		}
 	}
@@ -636,8 +634,22 @@ func (s *Server) chatCompletions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	model := modelFromBody(body)
-	if antigravity.IsModel(model) {
-		s.chatCompletionsAntigravity(w, r, body, model)
+	cliModel, matched, resolveErr := s.antigravity.ResolveModel(r.Context(), model)
+	if matched {
+		s.chatCompletionsAntigravity(w, r, body, model, cliModel.Name)
+		return
+	}
+	if antigravity.IsPotentialModelID(model) {
+		status := s.antigravity.Status(r.Context())
+		if !status.Installed {
+			http.Error(w, "Antigravity CLI is not installed or is not available to Nucleus", http.StatusServiceUnavailable)
+			return
+		}
+		if resolveErr != nil {
+			http.Error(w, "failed to load Antigravity CLI models: "+resolveErr.Error(), http.StatusBadGateway)
+			return
+		}
+		http.Error(w, "model is not supported by the installed Antigravity CLI: "+model, http.StatusBadRequest)
 		return
 	}
 	id := randomID()
@@ -685,7 +697,7 @@ type antigravityChatRequest struct {
 	Functions  json.RawMessage `json:"functions"`
 }
 
-func (s *Server) chatCompletionsAntigravity(w http.ResponseWriter, r *http.Request, body []byte, model string) {
+func (s *Server) chatCompletionsAntigravity(w http.ResponseWriter, r *http.Request, body []byte, model, cliModel string) {
 	if status := s.antigravity.Status(r.Context()); !status.Installed {
 		http.Error(w, "Antigravity CLI is not installed or is not available on the Nucleus PATH", http.StatusServiceUnavailable)
 		return
@@ -735,7 +747,7 @@ func (s *Server) chatCompletionsAntigravity(w http.ResponseWriter, r *http.Reque
 		w.Header().Set("Cache-Control", "no-cache")
 		flusher, _ := w.(http.Flusher)
 		writeAntigravityChunk(w, flusher, id, model, created, map[string]interface{}{"role": "assistant"}, nil)
-		_, err = s.antigravity.Complete(ctx, model, prompt, func(delta string) error {
+		_, err = s.antigravity.Complete(ctx, model, cliModel, prompt, func(delta string) error {
 			return writeAntigravityChunk(w, flusher, id, model, created, map[string]interface{}{"content": delta}, nil)
 		})
 		if err != nil {
@@ -753,7 +765,7 @@ func (s *Server) chatCompletionsAntigravity(w http.ResponseWriter, r *http.Reque
 		}
 	} else {
 		var result antigravity.Result
-		result, err = s.antigravity.Complete(ctx, model, prompt, nil)
+		result, err = s.antigravity.Complete(ctx, model, cliModel, prompt, nil)
 		if err != nil {
 			statusCode = http.StatusBadGateway
 			errText = err.Error()

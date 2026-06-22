@@ -111,15 +111,15 @@ For live token streaming, send:
 }
 ```
 
-Use `antigravity-cli` as the model ID to run Antigravity CLI's default model. Models reported by `agy models` are also exposed as `antigravity-cli/<model-name>`.
+Models reported by `agy models` are exposed directly as normalized OpenAI model IDs. For example, `Gemini 3.5 Flash (High)` becomes `gemini-3.5-flash-high`. The list updates automatically from the installed CLI.
 
 ```bash
 curl http://127.0.0.1:8787/v1/chat/completions \
   -H 'Content-Type: application/json' \
-  -d '{"model":"antigravity-cli","messages":[{"role":"user","content":"Say hello"}]}'
+  -d '{"model":"gemini-3.5-flash-high","messages":[{"role":"user","content":"Say hello"}]}'
 ```
 
-Antigravity models are listed only when the `agy` executable is installed. Requests return `503 Service Unavailable` when it is missing. This route is text-chat only: OpenAI tool requests and file/image content are rejected. Each request runs non-interactively with `--sandbox` in an empty temporary workspace, and `@file` expansion is escaped. If `agy` is not on the app's `PATH`, set `ANTIGRAVITY_CLI_PATH` or use `--antigravity-command /path/to/agy`.
+Antigravity models are listed only when the `agy` executable is installed. Nucleus also detects the official `~/.local/bin/agy` install when a macOS app launch does not inherit your shell `PATH`. Requests return `503 Service Unavailable` when it is missing. This route is text-chat only: OpenAI tool requests and file/image content are rejected. Each request runs non-interactively with `--sandbox` in an empty temporary workspace, and `@file` expansion is escaped. You can override detection with `ANTIGRAVITY_CLI_PATH` or `--antigravity-command /path/to/agy`.
 
 Image generation uses Ollama image generation models installed locally, such as `x/z-image-turbo` or `x/flux2-klein`:
 

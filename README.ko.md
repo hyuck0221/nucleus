@@ -111,18 +111,18 @@ curl http://127.0.0.1:8787/v1/chat/completions \
 }
 ```
 
-Antigravity CLI의 기본 모델을 사용하려면 `model`을 `antigravity-cli`로 지정합니다. `agy models`가 반환하는 모델은 `antigravity-cli/<모델명>` 형식으로도 선택할 수 있습니다.
+`agy models`가 반환하는 모델은 정규화된 OpenAI 모델 ID로 직접 노출됩니다. 예를 들어 `Gemini 3.5 Flash (High)`는 `gemini-3.5-flash-high`가 되며, 설치된 CLI의 모델 목록 변경을 자동으로 반영합니다.
 
 ```bash
 curl http://127.0.0.1:8787/v1/chat/completions \
   -H 'Content-Type: application/json' \
   -d '{
-    "model": "antigravity-cli",
+    "model": "gemini-3.5-flash-high",
     "messages": [{"role": "user", "content": "간단히 자기소개해줘"}]
   }'
 ```
 
-`agy` 실행 파일이 설치된 경우에만 Antigravity 모델이 목록에 표시되며, 설치되지 않은 상태에서 호출하면 `503 Service Unavailable`을 반환합니다. 이 경로는 텍스트 질문·답변 전용이라 OpenAI 도구 요청과 파일·이미지 콘텐츠를 거부합니다. 각 요청은 빈 임시 워크스페이스에서 비대화형 `--sandbox` 모드로 실행하고 `@file` 확장을 이스케이프합니다. 기본 `PATH`에서 CLI를 찾지 못하면 `ANTIGRAVITY_CLI_PATH` 또는 `--antigravity-command /path/to/agy`를 설정합니다.
+`agy` 실행 파일이 설치된 경우에만 Antigravity 모델이 목록에 표시됩니다. macOS 앱이 셸 `PATH`를 상속하지 않아도 공식 설치 위치인 `~/.local/bin/agy`를 자동 탐지하며, 설치되지 않은 상태에서 호출하면 `503 Service Unavailable`을 반환합니다. 이 경로는 텍스트 질문·답변 전용이라 OpenAI 도구 요청과 파일·이미지 콘텐츠를 거부합니다. 각 요청은 빈 임시 워크스페이스에서 비대화형 `--sandbox` 모드로 실행하고 `@file` 확장을 이스케이프합니다. 필요하면 `ANTIGRAVITY_CLI_PATH` 또는 `--antigravity-command /path/to/agy`로 경로를 지정할 수 있습니다.
 
 이미지 생성은 `x/z-image-turbo`, `x/flux2-klein`처럼 로컬 Ollama에 설치된 이미지 생성 모델을 사용합니다.
 

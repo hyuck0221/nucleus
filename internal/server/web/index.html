@@ -742,7 +742,12 @@
 
     function renderChatModels() {
       const selected = $('chatModel').value;
-      $('chatModel').innerHTML = chatModels.map((model) => `<option value="${escapeHTML(model.name)}">${escapeHTML(model.name)}${model.provider === 'antigravity-cli' ? ' (Antigravity CLI)' : ''}</option>`).join('');
+      $('chatModel').innerHTML = chatModels.map((model) => {
+        const label = model.provider === 'antigravity-cli' && model.displayName
+          ? `${model.displayName} · ${model.name}`
+          : model.name;
+        return `<option value="${escapeHTML(model.name)}">${escapeHTML(label)}${model.provider === 'antigravity-cli' ? ' (Antigravity CLI)' : ''}</option>`;
+      }).join('');
       if (chatModels.some((model) => model.name === selected)) {
         $('chatModel').value = selected;
       }

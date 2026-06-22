@@ -19,7 +19,7 @@ import (
 
 func TestAntigravityChatCompletion(t *testing.T) {
 	handler := antigravityTestHandler(t, fakeAntigravityCommand(t))
-	body := `{"model":"antigravity-cli","messages":[{"role":"user","content":"hello"}]}`
+	body := `{"model":"gemini-3.5-flash-high","messages":[{"role":"user","content":"hello"}]}`
 	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(body)))
 	if recorder.Code != http.StatusOK {
@@ -42,7 +42,7 @@ func TestAntigravityChatCompletion(t *testing.T) {
 
 func TestAntigravityChatRejectsTools(t *testing.T) {
 	handler := antigravityTestHandler(t, fakeAntigravityCommand(t))
-	body := `{"model":"antigravity-cli","messages":[{"role":"user","content":"hello"}],"tools":[{"type":"function"}]}`
+	body := `{"model":"gemini-3.5-flash-high","messages":[{"role":"user","content":"hello"}],"tools":[{"type":"function"}]}`
 	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewBufferString(body)))
 	if recorder.Code != http.StatusBadRequest {
@@ -52,7 +52,7 @@ func TestAntigravityChatRejectsTools(t *testing.T) {
 
 func TestAntigravityChatStreamsOpenAIChunks(t *testing.T) {
 	handler := antigravityTestHandler(t, fakeAntigravityCommand(t))
-	body := `{"model":"antigravity-cli","stream":true,"messages":[{"role":"user","content":"hello"}]}`
+	body := `{"model":"gemini-3.5-flash-high","stream":true,"messages":[{"role":"user","content":"hello"}]}`
 	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(body)))
 	if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), `"content":"from cli\n"`) || !strings.Contains(recorder.Body.String(), "data: [DONE]") {
@@ -64,15 +64,25 @@ func TestAntigravityChatRequiresInstalledCLI(t *testing.T) {
 	handler := antigravityTestHandler(t, filepath.Join(t.TempDir(), "missing-agy"))
 	modelsRecorder := httptest.NewRecorder()
 	handler.ServeHTTP(modelsRecorder, httptest.NewRequest(http.MethodGet, "/v1/models", nil))
-	if strings.Contains(modelsRecorder.Body.String(), antigravity.ModelID) {
+	if strings.Contains(modelsRecorder.Body.String(), "gemini-3.5-flash-high") {
 		t.Fatalf("missing Antigravity CLI was exposed in model list: %s", modelsRecorder.Body.String())
 	}
 
-	body := `{"model":"antigravity-cli","messages":[{"role":"user","content":"hello"}]}`
+	body := `{"model":"gemini-3.5-flash-high","messages":[{"role":"user","content":"hello"}]}`
 	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(body)))
 	if recorder.Code != http.StatusServiceUnavailable || !strings.Contains(recorder.Body.String(), "not installed") {
 		t.Fatalf("expected missing CLI error, got %d: %s", recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestAntigravityModelsUseDirectAPIIDs(t *testing.T) {
+	handler := antigravityTestHandler(t, fakeAntigravityCommand(t))
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/v1/models", nil))
+	body := recorder.Body.String()
+	if !strings.Contains(body, `"id":"gemini-3.5-flash-high"`) || strings.Contains(body, "antigravity-cli/") {
+		t.Fatalf("unexpected model list: %s", body)
 	}
 }
 
