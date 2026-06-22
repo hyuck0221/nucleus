@@ -29,11 +29,18 @@ Open the app, choose a model, and use it locally or from another machine on your
 
 ### Install Ollama first
 
-Nucleus uses Ollama as the local model runtime, so Ollama must be installed and running before models can be used.
+Nucleus uses Ollama for downloaded local models, so install and run it when you want to use Ollama models. Antigravity CLI chat can operate independently.
 
 ```bash
 brew install ollama
 ollama serve
+```
+
+To expose Antigravity CLI through the chat API too, install it locally and sign in once. Nucleus launches the local `agy` process; it does not call a model provider API directly.
+
+```bash
+curl -fsSL https://antigravity.google/cli/install.sh | bash
+agy
 ```
 
 ### Install Nucleus on macOS
@@ -103,6 +110,16 @@ For live token streaming, send:
   "stream": true
 }
 ```
+
+Use `antigravity-cli` as the model ID to run Antigravity CLI's default model. Models reported by `agy models` are also exposed as `antigravity-cli/<model-name>`.
+
+```bash
+curl http://127.0.0.1:8787/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"antigravity-cli","messages":[{"role":"user","content":"Say hello"}]}'
+```
+
+Antigravity models are listed only when the `agy` executable is installed. Requests return `503 Service Unavailable` when it is missing. This route is text-chat only: OpenAI tool requests and file/image content are rejected. Each request runs non-interactively with `--sandbox` in an empty temporary workspace, and `@file` expansion is escaped. If `agy` is not on the app's `PATH`, set `ANTIGRAVITY_CLI_PATH` or use `--antigravity-command /path/to/agy`.
 
 Image generation uses Ollama image generation models installed locally, such as `x/z-image-turbo` or `x/flux2-klein`:
 
@@ -211,9 +228,9 @@ If it does not connect:
 lsof -nP -iTCP:8787 -sTCP:LISTEN
 ```
 
-### Ollama is required
+### Model runtimes
 
-Nucleus manages and proxies local models, but Ollama remains the actual model runtime. If Ollama is stopped, model listing and inference will not work.
+Ollama runs downloaded local models, while the optional Antigravity integration runs the local `agy` executable. If either runtime is unavailable, its models are omitted while the other runtime can continue serving chat.
 
 ### Settings worth knowing
 

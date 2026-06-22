@@ -645,6 +645,7 @@
     let availableUpdate = null;
     let appSettings = {launchAtLogin:false, autoCheckUpdate:true, autoDeleteUsage:false, usageRetentionHours:72};
     let cachedModels = [];
+    let chatModels = [];
     let cliExportOptions = null;
     let selectedCliTool = 'opencode';
     let selectedAddressKind = 'local';
@@ -668,9 +669,10 @@
     };
 
     async function refresh() {
-      const [status, models, images] = await Promise.all([
+      const [status, models, chats, images] = await Promise.all([
         fetch('/api/status').then(r => r.json()),
         fetch('/api/models').then(r => r.ok ? r.json() : {models: []}),
+        fetch('/api/chat-models').then(r => r.ok ? r.json() : {models: []}),
         fetch('/api/image-models').then(r => r.ok ? r.json() : {models: []})
       ]);
       $('ollama').textContent = status.ollama.reachable ? 'online' : (status.ollama.installed ? 'offline' : 'missing');
@@ -679,6 +681,7 @@
       $('activeUsers').textContent = new Set(status.active.map(r => r.user)).size;
       $('recentModel').textContent = status.recent[0]?.model || 'none';
       cachedModels = models.models || [];
+      chatModels = chats.models || [];
       imageModels = images.models || [];
       recentRecords = status.recent || [];
       renderChatModels();
@@ -739,12 +742,12 @@
 
     function renderChatModels() {
       const selected = $('chatModel').value;
-      $('chatModel').innerHTML = cachedModels.map((model) => `<option value="${escapeHTML(model.name)}">${escapeHTML(model.name)}</option>`).join('');
-      if (cachedModels.some((model) => model.name === selected)) {
+      $('chatModel').innerHTML = chatModels.map((model) => `<option value="${escapeHTML(model.name)}">${escapeHTML(model.name)}${model.provider === 'antigravity-cli' ? ' (Antigravity CLI)' : ''}</option>`).join('');
+      if (chatModels.some((model) => model.name === selected)) {
         $('chatModel').value = selected;
       }
-      const current = $('chatModel').value || cachedModels[0]?.name || '';
-      $('chatStatus').textContent = current ? `${cachedModels.length} installed models available.` : 'No installed models. Download a model first.';
+      const current = $('chatModel').value || chatModels[0]?.name || '';
+      $('chatStatus').textContent = current ? `${chatModels.length} chat models available.` : 'No Ollama model or Antigravity CLI is available.';
       $('chatSendBtn').disabled = chatBusy || !current;
       renderApiGuide();
     }
@@ -800,7 +803,7 @@
 
     function renderApiGuide() {
       const origin = window.location.origin;
-      const model = $('chatModel').value || cachedModels[0]?.name || 'llama3.2';
+      const model = $('chatModel').value || chatModels[0]?.name || 'llama3.2';
       $('apiEndpointText').textContent = `${origin}/v1/chat/completions`;
       $('apiCurlExample').textContent = `curl ${origin}/v1/chat/completions \\
   -H "Content-Type: application/json" \\

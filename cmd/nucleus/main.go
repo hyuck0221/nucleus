@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/shimhyuck/nucleus/internal/antigravity"
 	"github.com/shimhyuck/nucleus/internal/ollama"
 	"github.com/shimhyuck/nucleus/internal/server"
 	"github.com/shimhyuck/nucleus/internal/store"
@@ -40,12 +41,14 @@ func serve(args []string) {
 	fs := flag.NewFlagSet("serve", flag.ExitOnError)
 	addr := fs.String("addr", "0.0.0.0:8787", "HTTP listen address")
 	ollamaURL := fs.String("ollama-url", env("OLLAMA_HOST", "http://127.0.0.1:11434"), "Ollama base URL")
+	antigravityCommand := fs.String("antigravity-command", env("ANTIGRAVITY_CLI_PATH", "agy"), "Antigravity CLI executable path")
 	_ = fs.Parse(args)
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	ollamaClient := ollama.New(*ollamaURL)
-	app := server.New(ollamaClient, store.New(200), logger)
-	logger.Info("nucleus starting", "addr", *addr, "ollama", *ollamaURL)
+	antigravityClient := antigravity.New(*antigravityCommand)
+	app := server.New(ollamaClient, antigravityClient, store.New(200), logger)
+	logger.Info("nucleus starting", "addr", *addr, "ollama", *ollamaURL, "antigravity", *antigravityCommand)
 	if err := http.ListenAndServe(*addr, app.Handler()); err != nil {
 		logger.Error("server stopped", "error", err)
 		os.Exit(1)
@@ -102,7 +105,7 @@ func usage() {
 	fmt.Print(`nucleus - local LLM orchestrator for macOS
 
 Usage:
-  nucleus serve [--addr 0.0.0.0:8787] [--ollama-url http://127.0.0.1:11434]
+  nucleus serve [--addr 0.0.0.0:8787] [--ollama-url http://127.0.0.1:11434] [--antigravity-command agy]
   nucleus status
   nucleus models
   nucleus pull <model>

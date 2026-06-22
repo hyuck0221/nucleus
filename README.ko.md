@@ -29,11 +29,18 @@ Nucleus는 다음 흐름을 한 앱 안에서 처리합니다.
 
 ### 먼저 Ollama 설치
 
-Nucleus는 Ollama를 로컬 모델 런타임으로 사용합니다. 따라서 Ollama가 먼저 설치되어 있고 실행 중이어야 합니다.
+Nucleus는 다운로드한 로컬 모델의 런타임으로 Ollama를 사용합니다. Ollama 모델을 사용할 때 설치하고 실행하면 되며, Antigravity CLI 채팅은 독립적으로 사용할 수 있습니다.
 
 ```bash
 brew install ollama
 ollama serve
+```
+
+Antigravity CLI를 채팅 API 모델로 함께 사용하려면 로컬에 설치하고 한 번 로그인합니다. Nucleus는 모델 제공사 API를 직접 호출하지 않고 로컬 `agy` 프로세스를 실행합니다.
+
+```bash
+curl -fsSL https://antigravity.google/cli/install.sh | bash
+agy
 ```
 
 ### macOS에 Nucleus 설치
@@ -103,6 +110,19 @@ curl http://127.0.0.1:8787/v1/chat/completions \
   "stream": true
 }
 ```
+
+Antigravity CLI의 기본 모델을 사용하려면 `model`을 `antigravity-cli`로 지정합니다. `agy models`가 반환하는 모델은 `antigravity-cli/<모델명>` 형식으로도 선택할 수 있습니다.
+
+```bash
+curl http://127.0.0.1:8787/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "model": "antigravity-cli",
+    "messages": [{"role": "user", "content": "간단히 자기소개해줘"}]
+  }'
+```
+
+`agy` 실행 파일이 설치된 경우에만 Antigravity 모델이 목록에 표시되며, 설치되지 않은 상태에서 호출하면 `503 Service Unavailable`을 반환합니다. 이 경로는 텍스트 질문·답변 전용이라 OpenAI 도구 요청과 파일·이미지 콘텐츠를 거부합니다. 각 요청은 빈 임시 워크스페이스에서 비대화형 `--sandbox` 모드로 실행하고 `@file` 확장을 이스케이프합니다. 기본 `PATH`에서 CLI를 찾지 못하면 `ANTIGRAVITY_CLI_PATH` 또는 `--antigravity-command /path/to/agy`를 설정합니다.
 
 이미지 생성은 `x/z-image-turbo`, `x/flux2-klein`처럼 로컬 Ollama에 설치된 이미지 생성 모델을 사용합니다.
 
@@ -211,9 +231,9 @@ curl http://your-mac.tailnet-name.ts.net:8787/v1/chat/completions \
 lsof -nP -iTCP:8787 -sTCP:LISTEN
 ```
 
-### Ollama는 필수
+### 모델 런타임
 
-Nucleus는 모델을 관리하고 API를 제공하지만, 실제 모델 실행은 Ollama가 담당합니다. Ollama가 꺼져 있으면 모델 목록 조회와 추론이 동작하지 않습니다.
+다운로드한 로컬 모델은 Ollama가 실행하고, 선택 기능인 Antigravity 연동은 로컬 `agy` 실행 파일을 사용합니다. 어느 한 런타임을 사용할 수 없으면 해당 모델만 목록에서 제외되고 다른 런타임의 채팅은 계속 동작합니다.
 
 ### 알아두면 좋은 설정
 

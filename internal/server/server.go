@@ -6,6 +6,7 @@ import (
 	"embed"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -20,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/shimhyuck/nucleus/internal/antigravity"
 	"github.com/shimhyuck/nucleus/internal/huggingface"
 	"github.com/shimhyuck/nucleus/internal/ollama"
 	"github.com/shimhyuck/nucleus/internal/settings"
@@ -32,19 +34,20 @@ import (
 var webFS embed.FS
 
 type Server struct {
-	ollama *ollama.Client
-	hf     *huggingface.Client
-	config *settings.Manager
-	update *updater.Client
-	store  *store.Store
-	logger *slog.Logger
+	ollama      *ollama.Client
+	antigravity *antigravity.Client
+	hf          *huggingface.Client
+	config      *settings.Manager
+	update      *updater.Client
+	store       *store.Store
+	logger      *slog.Logger
 
 	imageJobsMu sync.RWMutex
 	imageJobs   map[string]imageGenerationJob
 }
 
-func New(ollamaClient *ollama.Client, usage *store.Store, logger *slog.Logger) *Server {
-	srv := &Server{ollama: ollamaClient, hf: huggingface.New(), config: settings.New(), update: updater.New(), store: usage, logger: logger, imageJobs: make(map[string]imageGenerationJob)}
+func New(ollamaClient *ollama.Client, antigravityClient *antigravity.Client, usage *store.Store, logger *slog.Logger) *Server {
+	srv := &Server{ollama: ollamaClient, antigravity: antigravityClient, hf: huggingface.New(), config: settings.New(), update: updater.New(), store: usage, logger: logger, imageJobs: make(map[string]imageGenerationJob)}
 	go srv.cleanupUsageLoop()
 	return srv
 }
@@ -57,6 +60,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/favicon.ico", s.favicon)
 	mux.HandleFunc("/api/status", s.status)
 	mux.HandleFunc("/api/models", s.models)
+	mux.HandleFunc("/api/chat-models", s.chatModels)
 	mux.HandleFunc("/api/image-models", s.imageModels)
 	mux.HandleFunc("/api/model-suggestions", s.modelSuggestions)
 	mux.HandleFunc("/api/models/pull", s.pull)
@@ -110,16 +114,48 @@ func (s *Server) favicon(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) status(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
-	defer cancel()
+	ollamaStatusCh := make(chan ollama.Status, 1)
+	antigravityStatusCh := make(chan antigravity.Status, 1)
+	go func() {
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancel()
+		ollamaStatusCh <- s.ollama.Status(ctx)
+	}()
+	go func() {
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancel()
+		antigravityStatusCh <- s.antigravity.Status(ctx)
+	}()
 	active, recent := s.store.Snapshot()
 	writeJSON(w, map[string]interface{}{
-		"app":    map[string]string{"version": version.Version, "commit": version.Commit, "date": version.Date},
-		"ollama": s.ollama.Status(ctx),
-		"active": active,
-		"recent": recent,
-		"now":    time.Now(),
+		"app":         map[string]string{"version": version.Version, "commit": version.Commit, "date": version.Date},
+		"ollama":      <-ollamaStatusCh,
+		"antigravity": <-antigravityStatusCh,
+		"active":      active,
+		"recent":      recent,
+		"now":         time.Now(),
 	})
+}
+
+func (s *Server) chatModels(w http.ResponseWriter, r *http.Request) {
+	models, ollamaErr := s.ollama.Models(r.Context())
+	data := make([]map[string]interface{}, 0, len(models)+1)
+	for _, model := range models {
+		data = append(data, map[string]interface{}{"name": model.Name, "provider": "ollama"})
+	}
+	if status := s.antigravity.Status(r.Context()); status.Installed {
+		data = append(data, map[string]interface{}{"name": antigravity.ModelID, "provider": "antigravity-cli", "version": status.Version})
+		if cliModels, err := s.antigravity.Models(r.Context()); err == nil {
+			for _, model := range cliModels {
+				data = append(data, map[string]interface{}{"name": antigravity.ModelID + "/" + model, "provider": "antigravity-cli", "version": status.Version})
+			}
+		}
+	}
+	if len(data) == 0 && ollamaErr != nil {
+		http.Error(w, ollamaErr.Error(), http.StatusBadGateway)
+		return
+	}
+	writeJSON(w, map[string]interface{}{"models": data})
 }
 
 func (s *Server) models(w http.ResponseWriter, r *http.Request) {
@@ -567,13 +603,22 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) openAIModels(w http.ResponseWriter, r *http.Request) {
 	models, err := s.ollama.Models(r.Context())
-	if err != nil {
+	antigravityStatus := s.antigravity.Status(r.Context())
+	if err != nil && !antigravityStatus.Installed {
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
 	}
-	data := make([]map[string]interface{}, 0, len(models))
+	data := make([]map[string]interface{}, 0, len(models)+1)
 	for _, model := range models {
 		data = append(data, map[string]interface{}{"id": model.Name, "object": "model", "owned_by": "local-ollama"})
+	}
+	if antigravityStatus.Installed {
+		data = append(data, map[string]interface{}{"id": antigravity.ModelID, "object": "model", "owned_by": "local-antigravity-cli"})
+		if cliModels, modelsErr := s.antigravity.Models(r.Context()); modelsErr == nil {
+			for _, model := range cliModels {
+				data = append(data, map[string]interface{}{"id": antigravity.ModelID + "/" + model, "object": "model", "owned_by": "local-antigravity-cli"})
+			}
+		}
 	}
 	writeJSON(w, map[string]interface{}{"object": "list", "data": data})
 }
@@ -589,6 +634,10 @@ func (s *Server) chatCompletions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	model := modelFromBody(body)
+	if antigravity.IsModel(model) {
+		s.chatCompletionsAntigravity(w, r, body, model)
+		return
+	}
 	id := randomID()
 	record := store.RequestRecord{
 		ID:        id,
@@ -620,6 +669,148 @@ func (s *Server) chatCompletions(w http.ResponseWriter, r *http.Request) {
 		errText = copyErr.Error()
 	}
 	s.store.Finish(id, resp.StatusCode, errText)
+}
+
+type antigravityChatRequest struct {
+	Model    string `json:"model"`
+	Stream   bool   `json:"stream"`
+	Messages []struct {
+		Role    string          `json:"role"`
+		Content json.RawMessage `json:"content"`
+	} `json:"messages"`
+	Tools      json.RawMessage `json:"tools"`
+	ToolChoice json.RawMessage `json:"tool_choice"`
+	Functions  json.RawMessage `json:"functions"`
+}
+
+func (s *Server) chatCompletionsAntigravity(w http.ResponseWriter, r *http.Request, body []byte, model string) {
+	if status := s.antigravity.Status(r.Context()); !status.Installed {
+		http.Error(w, "Antigravity CLI is not installed or is not available on the Nucleus PATH", http.StatusServiceUnavailable)
+		return
+	}
+	var req antigravityChatRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		http.Error(w, "invalid JSON request: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if hasJSONValue(req.Tools) || hasJSONValue(req.ToolChoice) || hasJSONValue(req.Functions) {
+		http.Error(w, "Antigravity CLI API models support text chat only; tools, functions, and tool_choice are not allowed", http.StatusBadRequest)
+		return
+	}
+	messages := make([]antigravity.Message, 0, len(req.Messages))
+	for _, message := range req.Messages {
+		content, err := textContent(message.Content)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		role := strings.TrimSpace(message.Role)
+		if role != "system" && role != "user" && role != "assistant" && role != "developer" {
+			http.Error(w, "Antigravity CLI API models only accept system, developer, user, and assistant messages", http.StatusBadRequest)
+			return
+		}
+		messages = append(messages, antigravity.Message{Role: role, Content: content})
+	}
+	prompt, err := antigravity.BuildPrompt(messages)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	id := randomID()
+	created := time.Now()
+	ctx, cancel := context.WithCancel(r.Context())
+	defer cancel()
+	s.store.Start(store.RequestRecord{
+		ID: id, User: userFromRequest(r), Client: clientFromRequest(r), Model: model,
+		Path: r.URL.Path, StartedAt: created,
+	}, cancel)
+
+	statusCode := http.StatusOK
+	errText := ""
+	if req.Stream {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache")
+		flusher, _ := w.(http.Flusher)
+		writeAntigravityChunk(w, flusher, id, model, created, map[string]interface{}{"role": "assistant"}, nil)
+		_, err = s.antigravity.Complete(ctx, model, prompt, func(delta string) error {
+			return writeAntigravityChunk(w, flusher, id, model, created, map[string]interface{}{"content": delta}, nil)
+		})
+		if err != nil {
+			statusCode = http.StatusBadGateway
+			errText = err.Error()
+			payload, _ := json.Marshal(map[string]interface{}{"error": map[string]interface{}{"message": errText, "type": "antigravity_cli_error"}})
+			_, _ = fmt.Fprintf(w, "data: %s\n\n", payload)
+		} else {
+			finish := "stop"
+			writeAntigravityChunk(w, flusher, id, model, created, map[string]interface{}{}, &finish)
+		}
+		_, _ = w.Write([]byte("data: [DONE]\n\n"))
+		if flusher != nil {
+			flusher.Flush()
+		}
+	} else {
+		var result antigravity.Result
+		result, err = s.antigravity.Complete(ctx, model, prompt, nil)
+		if err != nil {
+			statusCode = http.StatusBadGateway
+			errText = err.Error()
+			http.Error(w, errText, statusCode)
+		} else {
+			writeJSON(w, map[string]interface{}{
+				"id": id, "object": "chat.completion", "created": created.Unix(), "model": result.Model,
+				"choices": []interface{}{map[string]interface{}{
+					"index": 0, "message": map[string]interface{}{"role": "assistant", "content": result.Content}, "finish_reason": "stop",
+				}},
+				"usage": map[string]int{"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+			})
+		}
+	}
+	s.store.Finish(id, statusCode, errText)
+}
+
+func writeAntigravityChunk(w io.Writer, flusher http.Flusher, id, model string, created time.Time, delta map[string]interface{}, finishReason *string) error {
+	payload, err := json.Marshal(map[string]interface{}{
+		"id": id, "object": "chat.completion.chunk", "created": created.Unix(), "model": model,
+		"choices": []interface{}{map[string]interface{}{"index": 0, "delta": delta, "finish_reason": finishReason}},
+	})
+	if err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(w, "data: %s\n\n", payload); err != nil {
+		return err
+	}
+	if flusher != nil {
+		flusher.Flush()
+	}
+	return nil
+}
+
+func hasJSONValue(raw json.RawMessage) bool {
+	trimmed := strings.TrimSpace(string(raw))
+	return trimmed != "" && trimmed != "null" && trimmed != "[]"
+}
+
+func textContent(raw json.RawMessage) (string, error) {
+	var text string
+	if err := json.Unmarshal(raw, &text); err == nil {
+		return text, nil
+	}
+	var parts []struct {
+		Type string `json:"type"`
+		Text string `json:"text"`
+	}
+	if err := json.Unmarshal(raw, &parts); err != nil {
+		return "", errors.New("Antigravity CLI API models require string or text-only message content")
+	}
+	var joined strings.Builder
+	for _, part := range parts {
+		if part.Type != "text" && part.Type != "input_text" {
+			return "", errors.New("Antigravity CLI API models do not accept images, files, or other non-text content")
+		}
+		joined.WriteString(part.Text)
+	}
+	return joined.String(), nil
 }
 
 func (s *Server) imageGenerations(w http.ResponseWriter, r *http.Request) {
