@@ -42,6 +42,11 @@ type Result struct {
 	Model   string
 }
 
+type Attachment struct {
+	Data      []byte
+	Extension string
+}
+
 type Model struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
@@ -162,10 +167,10 @@ func BuildPrompt(messages []Message) (string, error) {
 	// Antigravity CLI expands @path references before the model sees the prompt.
 	// JSON-escape @ so API input cannot attach or read a local file.
 	conversation := strings.ReplaceAll(string(data), "@", `\u0040`)
-	return "This is a text-only chat API request. Do not call tools, inspect the workspace, access files or URLs, run commands, use MCP, or delegate to agents. Answer the final message using only the conversation below. Reply only with the assistant answer.\n\nConversation JSON:\n" + conversation, nil
+	return "This is a chat API request. Do not call tools, inspect unrelated workspace files, access URLs, run commands, use MCP, or delegate to agents. Answer the final message using only the conversation and explicitly attached images. Reply only with the assistant answer.\n\nConversation JSON:\n" + conversation, nil
 }
 
-func (c *Client) Complete(ctx context.Context, apiModel, cliModel, prompt string, onDelta func(string) error) (Result, error) {
+func (c *Client) Complete(ctx context.Context, apiModel, cliModel, prompt string, attachments []Attachment, onDelta func(string) error) (Result, error) {
 	status := c.Status(ctx)
 	if !status.Installed {
 		return Result{}, fmt.Errorf("Antigravity CLI is unavailable: %s", status.Error)
@@ -175,6 +180,19 @@ func (c *Client) Complete(ctx context.Context, apiModel, cliModel, prompt string
 		return Result{}, err
 	}
 	defer os.RemoveAll(workDir)
+
+	if len(attachments) > 0 {
+		var refs strings.Builder
+		refs.WriteString("\n\nUploaded images supplied with this API request:\n")
+		for i, attachment := range attachments {
+			name := fmt.Sprintf("nucleus-upload-%d%s", i+1, attachment.Extension)
+			if err := os.WriteFile(filepath.Join(workDir, name), attachment.Data, 0o600); err != nil {
+				return Result{}, err
+			}
+			fmt.Fprintf(&refs, "- @%s\n", name)
+		}
+		prompt += refs.String()
+	}
 
 	args := []string{"--sandbox", "--print-timeout", "5m", "--log-file", filepath.Join(workDir, "agy.log")}
 	if strings.TrimSpace(cliModel) != "" {

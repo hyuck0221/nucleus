@@ -68,7 +68,7 @@ func TestCompleteReturnsPrintOutput(t *testing.T) {
 	command := fakeCommand(t, `
 printf 'hello\nworld\n'`)
 	var streamed strings.Builder
-	result, err := New(command).Complete(context.Background(), "gemini-3.5-flash-high", "Gemini 3.5 Flash (High)", "hello", func(delta string) error {
+	result, err := New(command).Complete(context.Background(), "gemini-3.5-flash-high", "Gemini 3.5 Flash (High)", "hello", nil, func(delta string) error {
 		streamed.WriteString(delta)
 		return nil
 	})
@@ -77,6 +77,39 @@ printf 'hello\nworld\n'`)
 	}
 	if result.Model != "gemini-3.5-flash-high" || result.Content != "hello\nworld" || strings.TrimSpace(streamed.String()) != result.Content {
 		t.Fatalf("unexpected result: %#v, stream: %q", result, streamed.String())
+	}
+}
+
+func TestCompleteWritesUploadedImages(t *testing.T) {
+	command := fakeCommand(t, `
+if [ ! -f nucleus-upload-1.png ]; then
+  echo "missing upload" >&2
+  exit 1
+fi
+found=
+for arg in "$@"; do
+  case "$arg" in
+    *"@nucleus-upload-1.png"*) found=yes ;;
+  esac
+done
+if [ "$found" != yes ]; then
+  echo "missing image reference" >&2
+  exit 1
+fi
+printf 'image received\n'`)
+	result, err := New(command).Complete(
+		context.Background(),
+		"gemini-3.5-flash-high",
+		"Gemini 3.5 Flash (High)",
+		"describe the image",
+		[]Attachment{{Data: []byte("png-data"), Extension: ".png"}},
+		nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Content != "image received" {
+		t.Fatalf("unexpected result: %#v", result)
 	}
 }
 

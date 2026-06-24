@@ -119,7 +119,27 @@ curl http://127.0.0.1:8787/v1/chat/completions \
   -d '{"model":"gemini-3.5-flash-high","messages":[{"role":"user","content":"Say hello"}]}'
 ```
 
-Antigravity models are listed only when the `agy` executable is installed. Nucleus also detects the official `~/.local/bin/agy` install when a macOS app launch does not inherit your shell `PATH`. Requests return `503 Service Unavailable` when it is missing. This route is text-chat only: OpenAI tool requests and file/image content are rejected. Each request runs non-interactively with `--sandbox` in an empty temporary workspace, and `@file` expansion is escaped. You can override detection with `ANTIGRAVITY_CLI_PATH` or `--antigravity-command /path/to/agy`.
+Antigravity models are listed only when the `agy` executable is installed. Nucleus also detects the official `~/.local/bin/agy` install when a macOS app launch does not inherit your shell `PATH`. Requests return `503 Service Unavailable` when it is missing. OpenAI tool requests and arbitrary file content are rejected. Each request runs non-interactively with `--sandbox` in an empty temporary workspace, and user-supplied `@file` expansion is escaped. You can override detection with `ANTIGRAVITY_CLI_PATH` or `--antigravity-command /path/to/agy`.
+
+Chat requests can include uploaded images using OpenAI-compatible `image_url` content parts. Use a base64 data URL; remote URLs and local file paths are not accepted by the Antigravity route. The same request format is forwarded unchanged to Ollama, so it also works with installed Ollama vision models.
+
+```json
+{
+  "model": "gemini-3.5-flash-low",
+  "messages": [{
+    "role": "user",
+    "content": [
+      {"type": "text", "text": "Describe this image"},
+      {
+        "type": "image_url",
+        "image_url": {"url": "data:image/png;base64,..."}
+      }
+    ]
+  }]
+}
+```
+
+Antigravity requests accept up to four PNG, JPEG, WebP, or GIF images, with a 10 MiB per-image and 20 MiB total limit.
 
 Image generation uses Ollama image generation models installed locally, such as `x/z-image-turbo` or `x/flux2-klein`:
 

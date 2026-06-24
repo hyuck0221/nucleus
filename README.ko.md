@@ -122,7 +122,27 @@ curl http://127.0.0.1:8787/v1/chat/completions \
   }'
 ```
 
-`agy` 실행 파일이 설치된 경우에만 Antigravity 모델이 목록에 표시됩니다. macOS 앱이 셸 `PATH`를 상속하지 않아도 공식 설치 위치인 `~/.local/bin/agy`를 자동 탐지하며, 설치되지 않은 상태에서 호출하면 `503 Service Unavailable`을 반환합니다. 이 경로는 텍스트 질문·답변 전용이라 OpenAI 도구 요청과 파일·이미지 콘텐츠를 거부합니다. 각 요청은 빈 임시 워크스페이스에서 비대화형 `--sandbox` 모드로 실행하고 `@file` 확장을 이스케이프합니다. 필요하면 `ANTIGRAVITY_CLI_PATH` 또는 `--antigravity-command /path/to/agy`로 경로를 지정할 수 있습니다.
+`agy` 실행 파일이 설치된 경우에만 Antigravity 모델이 목록에 표시됩니다. macOS 앱이 셸 `PATH`를 상속하지 않아도 공식 설치 위치인 `~/.local/bin/agy`를 자동 탐지하며, 설치되지 않은 상태에서 호출하면 `503 Service Unavailable`을 반환합니다. OpenAI 도구 요청과 임의 파일 콘텐츠는 거부합니다. 각 요청은 빈 임시 워크스페이스에서 비대화형 `--sandbox` 모드로 실행하고 사용자가 입력한 `@file` 확장을 이스케이프합니다. 필요하면 `ANTIGRAVITY_CLI_PATH` 또는 `--antigravity-command /path/to/agy`로 경로를 지정할 수 있습니다.
+
+채팅 요청에는 OpenAI 호환 `image_url` 콘텐츠로 업로드 이미지를 포함할 수 있습니다. Antigravity 경로에서는 Base64 데이터 URL만 허용하며 원격 URL과 로컬 파일 경로는 거부합니다. 같은 요청 형식을 Ollama에는 변경 없이 전달하므로 설치된 Ollama 비전 모델에서도 사용할 수 있습니다.
+
+```json
+{
+  "model": "gemini-3.5-flash-low",
+  "messages": [{
+    "role": "user",
+    "content": [
+      {"type": "text", "text": "이 이미지를 설명해줘"},
+      {
+        "type": "image_url",
+        "image_url": {"url": "data:image/png;base64,..."}
+      }
+    ]
+  }]
+}
+```
+
+Antigravity 요청은 PNG, JPEG, WebP, GIF 이미지를 최대 4개까지 허용하며 이미지당 10 MiB, 전체 20 MiB로 제한합니다.
 
 이미지 생성은 `x/z-image-turbo`, `x/flux2-klein`처럼 로컬 Ollama에 설치된 이미지 생성 모델을 사용합니다.
 

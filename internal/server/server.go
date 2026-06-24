@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"embed"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -628,8 +629,13 @@ func (s *Server) chatCompletions(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxChatRequestBytes))
 	if err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			http.Error(w, fmt.Sprintf("chat request may not exceed %d MiB", maxChatRequestBytes>>20), http.StatusRequestEntityTooLarge)
+			return
+		}
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -697,6 +703,13 @@ type antigravityChatRequest struct {
 	Functions  json.RawMessage `json:"functions"`
 }
 
+const (
+	maxChatRequestBytes    = 32 << 20
+	maxChatImages          = 4
+	maxChatImageBytes      = 10 << 20
+	maxChatImageTotalBytes = 20 << 20
+)
+
 func (s *Server) chatCompletionsAntigravity(w http.ResponseWriter, r *http.Request, body []byte, model, cliModel string) {
 	if status := s.antigravity.Status(r.Context()); !status.Installed {
 		http.Error(w, "Antigravity CLI is not installed or is not available on the Nucleus PATH", http.StatusServiceUnavailable)
@@ -708,15 +721,29 @@ func (s *Server) chatCompletionsAntigravity(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	if hasJSONValue(req.Tools) || hasJSONValue(req.ToolChoice) || hasJSONValue(req.Functions) {
-		http.Error(w, "Antigravity CLI API models support text chat only; tools, functions, and tool_choice are not allowed", http.StatusBadRequest)
+		http.Error(w, "Antigravity CLI API models support chat content only; tools, functions, and tool_choice are not allowed", http.StatusBadRequest)
 		return
 	}
 	messages := make([]antigravity.Message, 0, len(req.Messages))
+	attachments := make([]antigravity.Attachment, 0)
+	totalImageBytes := 0
 	for _, message := range req.Messages {
-		content, err := textContent(message.Content)
+		content, images, err := multimodalContent(message.Content)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
+		}
+		if len(attachments)+len(images) > maxChatImages {
+			http.Error(w, fmt.Sprintf("a maximum of %d images is allowed per chat request", maxChatImages), http.StatusBadRequest)
+			return
+		}
+		for _, image := range images {
+			totalImageBytes += len(image.Data)
+			if totalImageBytes > maxChatImageTotalBytes {
+				http.Error(w, fmt.Sprintf("chat images may not exceed %d MiB in total", maxChatImageTotalBytes>>20), http.StatusRequestEntityTooLarge)
+				return
+			}
+			attachments = append(attachments, image)
 		}
 		role := strings.TrimSpace(message.Role)
 		if role != "system" && role != "user" && role != "assistant" && role != "developer" {
@@ -747,7 +774,7 @@ func (s *Server) chatCompletionsAntigravity(w http.ResponseWriter, r *http.Reque
 		w.Header().Set("Cache-Control", "no-cache")
 		flusher, _ := w.(http.Flusher)
 		writeAntigravityChunk(w, flusher, id, model, created, map[string]interface{}{"role": "assistant"}, nil)
-		_, err = s.antigravity.Complete(ctx, model, cliModel, prompt, func(delta string) error {
+		_, err = s.antigravity.Complete(ctx, model, cliModel, prompt, attachments, func(delta string) error {
 			return writeAntigravityChunk(w, flusher, id, model, created, map[string]interface{}{"content": delta}, nil)
 		})
 		if err != nil {
@@ -765,7 +792,7 @@ func (s *Server) chatCompletionsAntigravity(w http.ResponseWriter, r *http.Reque
 		}
 	} else {
 		var result antigravity.Result
-		result, err = s.antigravity.Complete(ctx, model, cliModel, prompt, nil)
+		result, err = s.antigravity.Complete(ctx, model, cliModel, prompt, attachments, nil)
 		if err != nil {
 			statusCode = http.StatusBadGateway
 			errText = err.Error()
@@ -805,26 +832,72 @@ func hasJSONValue(raw json.RawMessage) bool {
 	return trimmed != "" && trimmed != "null" && trimmed != "[]"
 }
 
-func textContent(raw json.RawMessage) (string, error) {
+func multimodalContent(raw json.RawMessage) (string, []antigravity.Attachment, error) {
 	var text string
 	if err := json.Unmarshal(raw, &text); err == nil {
-		return text, nil
+		return text, nil, nil
 	}
 	var parts []struct {
-		Type string `json:"type"`
-		Text string `json:"text"`
+		Type     string `json:"type"`
+		Text     string `json:"text"`
+		ImageURL struct {
+			URL string `json:"url"`
+		} `json:"image_url"`
 	}
 	if err := json.Unmarshal(raw, &parts); err != nil {
-		return "", errors.New("Antigravity CLI API models require string or text-only message content")
+		return "", nil, errors.New("message content must be a string or an array of text and image_url parts")
 	}
 	var joined strings.Builder
+	images := make([]antigravity.Attachment, 0)
 	for _, part := range parts {
-		if part.Type != "text" && part.Type != "input_text" {
-			return "", errors.New("Antigravity CLI API models do not accept images, files, or other non-text content")
+		switch part.Type {
+		case "text", "input_text":
+			joined.WriteString(part.Text)
+		case "image_url":
+			image, err := decodeChatImage(part.ImageURL.URL)
+			if err != nil {
+				return "", nil, err
+			}
+			images = append(images, image)
+		default:
+			return "", nil, fmt.Errorf("unsupported message content type %q; only text and image_url are allowed", part.Type)
 		}
-		joined.WriteString(part.Text)
 	}
-	return joined.String(), nil
+	return joined.String(), images, nil
+}
+
+func decodeChatImage(value string) (antigravity.Attachment, error) {
+	const prefix = "data:"
+	if !strings.HasPrefix(value, prefix) {
+		return antigravity.Attachment{}, errors.New("Antigravity chat images must use data:image/...;base64 URLs; remote and local file URLs are not allowed")
+	}
+	header, encoded, ok := strings.Cut(strings.TrimPrefix(value, prefix), ",")
+	lowerHeader := strings.ToLower(header)
+	if !ok || !strings.HasSuffix(lowerHeader, ";base64") {
+		return antigravity.Attachment{}, errors.New("chat image data URL must be base64 encoded")
+	}
+	mimeType := strings.TrimSuffix(lowerHeader, ";base64")
+	extensions := map[string]string{
+		"image/png":  ".png",
+		"image/jpeg": ".jpg",
+		"image/webp": ".webp",
+		"image/gif":  ".gif",
+	}
+	extension, ok := extensions[mimeType]
+	if !ok {
+		return antigravity.Attachment{}, fmt.Errorf("unsupported chat image type %q", mimeType)
+	}
+	data, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil {
+		return antigravity.Attachment{}, errors.New("chat image contains invalid base64 data")
+	}
+	if len(data) == 0 {
+		return antigravity.Attachment{}, errors.New("chat image is empty")
+	}
+	if len(data) > maxChatImageBytes {
+		return antigravity.Attachment{}, fmt.Errorf("each chat image may not exceed %d MiB", maxChatImageBytes>>20)
+	}
+	return antigravity.Attachment{Data: data, Extension: extension}, nil
 }
 
 func (s *Server) imageGenerations(w http.ResponseWriter, r *http.Request) {
