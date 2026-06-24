@@ -113,6 +113,16 @@ printf 'image received\n'`)
 	}
 }
 
+func TestBuildPromptAllowsOnlyExplicitUploads(t *testing.T) {
+	prompt, err := BuildPrompt([]Message{{Role: "user", Content: "describe it"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(prompt, "nucleus-upload-*") || !strings.Contains(prompt, "must be read") {
+		t.Fatalf("prompt does not authorize explicit uploads: %q", prompt)
+	}
+}
+
 func fakeCommand(t *testing.T, body string) string {
 	t.Helper()
 	command := filepath.Join(t.TempDir(), "agy")

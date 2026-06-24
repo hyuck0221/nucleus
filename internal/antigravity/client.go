@@ -167,7 +167,7 @@ func BuildPrompt(messages []Message) (string, error) {
 	// Antigravity CLI expands @path references before the model sees the prompt.
 	// JSON-escape @ so API input cannot attach or read a local file.
 	conversation := strings.ReplaceAll(string(data), "@", `\u0040`)
-	return "This is a chat API request. Do not call tools, inspect unrelated workspace files, access URLs, run commands, use MCP, or delegate to agents. Answer the final message using only the conversation and explicitly attached images. Reply only with the assistant answer.\n\nConversation JSON:\n" + conversation, nil
+	return "This is a chat API request. Files named nucleus-upload-* that are explicitly referenced as uploaded images are part of the user message and must be read. Do not inspect any other workspace files, access URLs, run commands, use MCP, or delegate to agents. Answer the final message using only the conversation and explicitly attached images. Reply only with the assistant answer.\n\nConversation JSON:\n" + conversation, nil
 }
 
 func (c *Client) Complete(ctx context.Context, apiModel, cliModel, prompt string, attachments []Attachment, onDelta func(string) error) (Result, error) {
@@ -183,15 +183,15 @@ func (c *Client) Complete(ctx context.Context, apiModel, cliModel, prompt string
 
 	if len(attachments) > 0 {
 		var refs strings.Builder
-		refs.WriteString("\n\nUploaded images supplied with this API request:\n")
+		refs.WriteString("Explicitly uploaded images:\n")
 		for i, attachment := range attachments {
 			name := fmt.Sprintf("nucleus-upload-%d%s", i+1, attachment.Extension)
 			if err := os.WriteFile(filepath.Join(workDir, name), attachment.Data, 0o600); err != nil {
 				return Result{}, err
 			}
-			fmt.Fprintf(&refs, "- @%s\n", name)
+			fmt.Fprintf(&refs, "Uploaded image %d: @%s\n", i+1, name)
 		}
-		prompt += refs.String()
+		prompt = refs.String() + "\n" + prompt
 	}
 
 	args := []string{"--sandbox", "--print-timeout", "5m", "--log-file", filepath.Join(workDir, "agy.log")}
